@@ -54,6 +54,10 @@ export default function CategoryClient({
   const [openPrice, setOpenPrice] = useState(true);
   const [openColor, setOpenColor] = useState(true);
 
+  // On mobile the filter panel is collapsed by default so products are visible
+  // without scrolling past a full screen of filters. Always shown on desktop.
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+
   const priceTouched = maxPrice < priceCeiling;
 
   const filtered = useMemo(() => {
@@ -102,8 +106,9 @@ export default function CategoryClient({
   const toggle = (list: string[], set: (v: string[]) => void, value: string) =>
     set(list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
 
-  const anyFilter =
-    sizes.length > 0 || colors.length > 0 || priceTouched || subSlug !== null;
+  const activeCount =
+    sizes.length + colors.length + (priceTouched ? 1 : 0) + (subSlug ? 1 : 0);
+  const anyFilter = activeCount > 0;
   const clearAll = () => {
     setSizes([]);
     setColors([]);
@@ -172,8 +177,36 @@ export default function CategoryClient({
 
       <div className="mt-10 grid gap-8 lg:grid-cols-[240px_1fr]">
         {/* ── Filters ── */}
-        <aside>
-          <div className="mb-6 flex items-center justify-between border-b-2 border-navy pb-2">
+        <aside className="lg:self-start">
+          {/* Mobile toggle — collapsed by default so products show first */}
+          <div className="mb-4 flex items-center gap-3 lg:hidden">
+            <button
+              onClick={() => setMobileFiltersOpen((o) => !o)}
+              className="flex flex-1 items-center justify-between border-2 border-navy px-4 py-3"
+            >
+              <span className="flex items-center gap-2 font-display uppercase text-lg text-navy">
+                {t("filters")}
+                {activeCount > 0 && (
+                  <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1.5 text-xs font-bold text-white">
+                    {activeCount}
+                  </span>
+                )}
+              </span>
+              {mobileFiltersOpen ? <Minus size={18} /> : <Plus size={18} />}
+            </button>
+            {anyFilter && (
+              <button
+                onClick={clearAll}
+                className="text-xs font-extrabold uppercase tracking-wider text-brand hover:underline cursor-pointer"
+              >
+                {t("clearAll")}
+              </button>
+            )}
+          </div>
+
+          {/* Filter panel — hidden on mobile unless toggled, always shown on desktop */}
+          <div className={clsx(mobileFiltersOpen ? "block" : "hidden", "lg:block")}>
+          <div className="mb-6 hidden items-center justify-between border-b-2 border-navy pb-2 lg:flex">
             <h2 className="font-display uppercase text-2xl text-navy">
               {t("filters")}
             </h2>
@@ -272,6 +305,7 @@ export default function CategoryClient({
               </div>
             </FilterSection>
           )}
+          </div>
         </aside>
 
         {/* ── Results ── */}
