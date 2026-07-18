@@ -1,0 +1,310 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-brand: #c90024;
+  --color-brand-dark: #9b001b;
+  --color-navy: #081a36;
+  --color-navy-deep: #041026;
+  --color-surface: #eef0f4;
+  --color-page: #f6f7fa;
+  --color-muted: #58647f;
+  --color-amber: #ffb000;
+  --color-success: #18a755;
+  --color-ice: #d7e3ff;
+  --font-display: var(--font-anton), var(--font-cairo), system-ui, sans-serif;
+  --font-sans: var(--font-body), var(--font-cairo), system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background: #f6f7fa;
+}
+
+body {
+  min-width: 320px;
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.58), transparent 280px),
+    var(--color-page);
+  color: var(--color-navy);
+  font-family: var(--font-body), var(--font-cairo), system-ui, sans-serif;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+[class*="tracking-"] {
+  letter-spacing: 0;
+}
+
+::selection {
+  background: var(--color-brand);
+  color: white;
+}
+
+.romz-page {
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.65), transparent 260px),
+    var(--color-page);
+}
+
+.romz-panel {
+  position: relative;
+  border: 2px solid var(--color-ice);
+  background: white;
+  box-shadow: 10px 10px 0 0 rgb(8 26 54 / 0.06);
+}
+
+.romz-panel::after {
+  content: "";
+  position: absolute;
+  inset-block-start: -2px;
+  inset-inline-end: -2px;
+  width: 22px;
+  height: 22px;
+  background: linear-gradient(135deg, transparent 50%, var(--color-page) 51%);
+  pointer-events: none;
+}
+
+.romz-panel-navy {
+  background: var(--color-navy);
+  color: white;
+  box-shadow: 14px 14px 0 0 rgb(8 26 54 / 0.18);
+}
+
+.romz-rule {
+  height: 6px;
+  background: var(--color-navy);
+}
+
+.romz-rule-red {
+  height: 6px;
+  background: var(--color-brand);
+}
+
+.romz-field {
+  border: 0;
+  border-bottom: 2px solid var(--color-navy);
+  background: transparent;
+  color: var(--color-navy);
+  outline: 0;
+}
+
+.romz-field:focus {
+  border-color: var(--color-brand);
+}
+
+.ghost-text {
+  color: transparent;
+  -webkit-text-stroke: 1.5px rgb(8 26 54 / 0.08);
+  user-select: none;
+  pointer-events: none;
+}
+
+.ghost-text-light {
+  color: transparent;
+  -webkit-text-stroke: 1.5px rgb(255 255 255 / 0.11);
+  user-select: none;
+  pointer-events: none;
+}
+
+.clip-diagonal-top {
+  clip-path: polygon(0 3rem, 100% 0, 100% 100%, 0 100%);
+}
+
+.clip-diagonal-top-flip {
+  clip-path: polygon(0 0, 100% 3rem, 100% 100%, 0 100%);
+}
+
+.clip-diagonal-bottom {
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 3rem), 0 100%);
+}
+
+.skew-cta {
+  transform: skewX(-8deg);
+}
+
+.skew-cta > * {
+  display: inline-block;
+  transform: skewX(8deg);
+}
+
+[dir="rtl"] .skew-cta {
+  transform: skewX(8deg);
+}
+
+[dir="rtl"] .skew-cta > * {
+  transform: skewX(-8deg);
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  scrollbar-width: none;
+}
+
+@keyframes badge-pop {
+  0% {
+    scale: 1;
+  }
+  40% {
+    scale: 1.5;
+  }
+  100% {
+    scale: 1;
+  }
+}
+
+.animate-badge-pop {
+  animation: badge-pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.romz-cta {
+  position: relative;
+  overflow: hidden;
+  box-shadow: 6px 6px 0 0 rgb(8 26 54 / 0.18);
+  transition:
+    translate 0.2s ease,
+    box-shadow 0.2s ease,
+    color 0.2s,
+    background-color 0.2s,
+    border-color 0.2s,
+    scale 0.2s;
+}
+
+.romz-cta::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  left: -75%;
+  width: 45%;
+  background: linear-gradient(
+    120deg,
+    transparent,
+    rgb(255 255 255 / 0.55),
+    transparent
+  );
+  transform: skewX(8deg);
+  transition: left 0.6s ease;
+  pointer-events: none;
+}
+
+[dir="rtl"] .romz-cta::after {
+  transform: skewX(-8deg);
+}
+
+.romz-cta:hover {
+  translate: 0 -2px;
+  box-shadow: 9px 9px 0 0 rgb(8 26 54 / 0.24);
+}
+
+.romz-cta:hover::after {
+  left: 130%;
+}
+
+@keyframes logo-float {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  50% {
+    translate: 0 -3px;
+  }
+}
+
+.logo-3d {
+  perspective: 600px;
+}
+
+.logo-3d-mark {
+  animation: logo-float 3.2s ease-in-out infinite;
+  transition:
+    transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1),
+    filter 0.4s ease;
+  transform-style: preserve-3d;
+  filter: drop-shadow(0 3px 5px rgb(0 0 0 / 0.25));
+}
+
+.logo-3d:hover .logo-3d-mark {
+  transform: rotateY(360deg) scale(1.12);
+  filter: drop-shadow(0 6px 12px rgb(201 0 36 / 0.45));
+}
+
+/* ── Brand range slider (category price filter) ── */
+.romz-range {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  background: color-mix(in srgb, var(--color-navy) 20%, transparent);
+  outline: none;
+}
+.romz-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 18px;
+  width: 18px;
+  background: var(--color-brand);
+  border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.3);
+  cursor: pointer;
+  border-radius: 0;
+  transform: skewX(-8deg);
+}
+.romz-range::-moz-range-thumb {
+  height: 18px;
+  width: 18px;
+  background: var(--color-brand);
+  border: 2px solid #fff;
+  cursor: pointer;
+  border-radius: 0;
+}
+.romz-range::-moz-range-track {
+  height: 4px;
+  background: color-mix(in srgb, var(--color-navy) 20%, transparent);
+}
+
+@keyframes hero-cue {
+  0%,
+  100% {
+    translate: 0 0;
+    opacity: 0.35;
+  }
+  50% {
+    translate: 0 8px;
+    opacity: 1;
+  }
+}
+
+.animate-hero-cue {
+  animation: hero-cue 1.8s ease-in-out infinite;
+}
+
+@media (max-width: 768px) {
+  .romz-panel {
+    box-shadow: 6px 6px 0 0 rgb(8 26 54 / 0.05);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-badge-pop,
+  .logo-3d-mark,
+  .animate-hero-cue {
+    animation: none;
+  }
+
+  .romz-cta:hover {
+    translate: 0 0;
+  }
+
+  .logo-3d:hover .logo-3d-mark {
+    transform: none;
+  }
+}

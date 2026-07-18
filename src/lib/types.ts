@@ -1,0 +1,222 @@
+// Shared TypeScript types — this is the API contract with the backend.
+// Field names mirror the Mongoose models in the project plan (section 2).
+
+export type Locale = "en" | "ar";
+
+export interface LocalizedText {
+  en: string;
+  ar: string;
+}
+
+export interface ProductImage {
+  /** Absolute URL used by the browser. */
+  url: string;
+  /** Exact URL returned by the backend, retained for existingImages updates. */
+  backendUrl?: string;
+  publicId?: string;
+  color?: string; // hex of the color this image belongs to
+}
+
+export interface Category {
+  id: string;
+  slug: string;
+  name: LocalizedText;
+  order: number;
+  /** Parent category id — null/undefined for top-level categories. */
+  parentId?: string | null;
+  /** Parent category slug, resolved for storefront routing/breadcrumbs. */
+  parentSlug?: string | null;
+  image?: ProductImage;
+  /** Subcategories, populated when the flat list is arranged into a tree. */
+  children?: Category[];
+}
+
+export interface StorefrontSettings {
+  promoBar: {
+    active: boolean;
+    text: LocalizedText;
+  };
+  payments: {
+    paymob: {
+      active: boolean;
+    };
+  };
+  freeShippingThreshold: number | null;
+  lowStockThreshold: number;
+}
+
+export interface ProductColor {
+  name: LocalizedText;
+  hex: string;
+}
+
+export interface Variant {
+  id: string;
+  sku: string;
+  size: string;
+  color: ProductColor;
+  stock: number;
+  priceOverride?: number | null;
+}
+
+export type Badge = "new" | "best-seller" | "sale";
+
+export interface Product {
+  id: string;
+  slug: string;
+  name: LocalizedText;
+  description: LocalizedText;
+  category: string; // primary category slug
+  /**
+   * All category slugs the product belongs to (includes the primary).
+   * Falls back to `[category]` until the backend exposes a `categories` array.
+   */
+  categories: string[];
+  basePrice: number;
+  salePrice?: number | null;
+  images: ProductImage[];
+  variants: Variant[];
+  badges: Badge[];
+  ratingAvg: number;
+  ratingCount: number;
+  sold: number;
+}
+
+export interface Review {
+  id: string;
+  productId: string;
+  name: string;
+  rating: number;
+  comment: LocalizedText;
+  isVerifiedPurchase: boolean;
+}
+
+export interface ShippingZone {
+  id: string;
+  governorate: LocalizedText;
+  fee: number;
+  estimatedDays: string;
+}
+
+export interface Coupon {
+  /** Mongo _id — present when loaded from the backend, absent in mock data. */
+  id?: string;
+  code: string;
+  type: "percent" | "fixed";
+  value: number;
+  minOrderTotal: number;
+  usedCount: number;
+  discountGiven: number;
+  revenueGenerated: number;
+  isActive: boolean;
+}
+
+export type OrderStatus =
+  | "pending"
+  | "confirmed"
+  | "processing"
+  | "shipped"
+  | "delivered"
+  | "cancelled"
+  | "returned";
+
+export type PaymentMethod = "paymob" | "cod";
+export type PaymentStatus = "pending" | "paid" | "failed" | "refunded";
+
+/** Paymob checkout mode returned by the payment intent. */
+export type PaymentProvider = "unified_checkout" | "legacy_iframe";
+
+export interface PaymentIntent {
+  redirectUrl?: string;
+  /** Hosted checkout URL — used when provider is `unified_checkout`. */
+  checkoutUrl?: string;
+  /** Legacy iframe URL — used when provider is `legacy_iframe`. */
+  iframeUrl?: string;
+  provider?: PaymentProvider | string;
+  /** Newer backend field for the checkout mode. */
+  flow?: PaymentProvider | string;
+}
+
+export interface OrderItem {
+  productId: string;
+  name: LocalizedText;
+  sku: string;
+  size: string;
+  colorName: string;
+  colorHex: string;
+  qty: number;
+  unitPrice: number;
+  image?: string;
+}
+
+export interface Order {
+  id: string;
+  orderNumber: string;
+  customer: { name: string; email: string; phone: string };
+  shippingAddress: {
+    governorate: string;
+    city: string;
+    street: string;
+    apartment?: string;
+  };
+  items: OrderItem[];
+  subtotal: number;
+  shippingFee: number;
+  discount?: { couponCode: string; amount: number };
+  total: number;
+  paymentMethod: PaymentMethod;
+  paymentStatus: PaymentStatus;
+  status: OrderStatus;
+  courier?: {
+    provider?: string;
+    trackingNumber?: string;
+    pickupOrderCode?: string;
+    status?: string;
+  };
+  createdAt: string; // ISO date
+}
+
+export type ContactStatus = "new" | "read" | "replied" | "archived";
+
+export interface ContactMessage {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  subject: string;
+  message: string;
+  status: ContactStatus;
+  adminNotes?: string;
+  source?: string;
+  ipAddress?: string;
+  userAgent?: string;
+  /** Registered account id if the sender was logged in, otherwise null. */
+  user?: string | null;
+  readAt?: string | null;
+  repliedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Backend pagination envelope (`meta`) shared by list endpoints. */
+export interface PageMeta {
+  page: number;
+  limit: number;
+  total: number;
+  pages: number;
+}
+
+export interface CartItem {
+  productId: string;
+  variantId: string;
+  slug: string;
+  name: LocalizedText;
+  sku: string;
+  size: string;
+  colorName: string;
+  colorHex: string;
+  qty: number;
+  unitPrice: number;
+  image?: string;
+  maxStock: number;
+}

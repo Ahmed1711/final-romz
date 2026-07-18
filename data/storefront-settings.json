@@ -1,0 +1,14 @@
+{
+  "promoBar": {
+    "active": true,
+    "text": {
+      "en": "2 ITEMS = FREE SHIPPING - 3 ITEMS = 15% OFF + FREE SHIPPING",
+      "ar": "قطعتين = شحن مجاني - 3 قطع = خصم 15% + شحن مجاني"
+    }
+  },
+  "payments": {
+    "paymob": {
+      "active": true
+    }
+  }
+}
