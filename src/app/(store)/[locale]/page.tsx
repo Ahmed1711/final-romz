@@ -37,7 +37,7 @@ export default async function HomePage({
               href={`/category/${categories[0].slug}`}
               className={btn("primary", "md")}
             >
-              <span>{t("viewAll")}</span>
+              <span>{t("shopTheDrop")}</span>
             </Link>
           </Reveal>
         )}

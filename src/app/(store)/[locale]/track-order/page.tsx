@@ -40,8 +40,6 @@ export default function TrackOrderPage() {
   const currentStep = order ? STEPS.indexOf(order.status) : -1;
   const isCancelled =
     order?.status === "cancelled" || order?.status === "returned";
-  const canCancel =
-    order && !isCancelled && ["pending", "confirmed"].includes(order.status);
 
   return (
     <div className="pb-20">
@@ -117,14 +115,6 @@ export default function TrackOrderPage() {
                   {t("placedOn", { date: formatDate(order.createdAt, locale) })}
                 </p>
               </div>
-              {canCancel && (
-                <div className="text-end">
-                  <button className="skew-cta border-2 border-brand px-5 py-2.5 text-sm font-display uppercase tracking-wider text-brand hover:bg-brand hover:text-white transition-colors cursor-pointer">
-                    <span>{t("cancelOrder")}</span>
-                  </button>
-                  <p className="mt-1 text-[11px] text-muted">{t("cancelNote")}</p>
-                </div>
-              )}
             </div>
 
             {isCancelled ? (
