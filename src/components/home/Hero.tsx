@@ -10,7 +10,7 @@ export default function Hero() {
       title={t("title")}
       subtitle={t("subtitle")}
       cta={t("cta")}
-      ctaHref="/category/compressions"
+      ctaHref="/#new-arrivals"
     />
   );
 }

@@ -26,7 +26,10 @@ export default async function HomePage({
       <Hero />
 
       {/* New Arrivals */}
-      <section className="mx-auto max-w-[1440px] px-6 py-16 md:py-24">
+      <section
+        id="new-arrivals"
+        className="mx-auto max-w-[1440px] scroll-mt-24 px-6 py-16 md:py-24"
+      >
         <Reveal direction="start">
           <SectionHeading title={t("newArrivals")} ghost="01" />
         </Reveal>
