@@ -65,11 +65,44 @@ export default function Footer({ categories = [] }: { categories?: Category[] })
                 {t("contact")}
               </Link>
             </li>
-            <li><span className="cursor-pointer hover:text-white">{t("support")}</span></li>
-            <li><span className="cursor-pointer hover:text-white">{t("shipping")}</span></li>
-            <li><span className="cursor-pointer hover:text-white">{t("returns")}</span></li>
-            <li><span className="cursor-pointer hover:text-white">{t("privacy")}</span></li>
-            <li><span className="cursor-pointer hover:text-white">{t("terms")}</span></li>
+            <li>
+              <Link href="/shipping-policy" className="hover:text-white">
+                {t("shippingPolicy")}
+              </Link>
+            </li>
+            <li>
+              <Link href="/refund-policy" className="hover:text-white">
+                {t("refundPolicy")}
+              </Link>
+            </li>
+            <li>
+              <Link href="/track-order" className="hover:text-white">
+                {tn("trackOrder")}
+              </Link>
+            </li>
+          </ul>
+        </div>
+
+        <div>
+          <h3 className="mb-5 text-xs font-extrabold uppercase text-brand">
+            {t("company")}
+          </h3>
+          <ul className="space-y-4 text-sm font-bold uppercase text-white/75">
+            <li>
+              <Link href="/about" className="hover:text-white">
+                {t("about")}
+              </Link>
+            </li>
+            <li>
+              <Link href="/privacy-policy" className="hover:text-white">
+                {t("privacy")}
+              </Link>
+            </li>
+            <li>
+              <Link href="/terms" className="hover:text-white">
+                {t("terms")}
+              </Link>
+            </li>
           </ul>
         </div>
       </div>
