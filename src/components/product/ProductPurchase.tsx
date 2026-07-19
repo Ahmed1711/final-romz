@@ -7,6 +7,7 @@ import clsx from "clsx";
 import { useRouter } from "@/i18n/navigation";
 import Button from "@/components/ui/Button";
 import { useCart } from "@/components/cart/CartProvider";
+import SizeChartModal, { hasSizeChart } from "@/components/product/SizeChartModal";
 import { lt } from "@/lib/format";
 import { orderSizes } from "@/lib/product";
 import type { Locale, Product, ProductColor } from "@/lib/types";
@@ -34,6 +35,8 @@ export default function ProductPurchase({
   const [size, setSize] = useState<string | null>(null);
   const [qty, setQty] = useState(1);
   const [sizeError, setSizeError] = useState(false);
+  const [showSizeChart, setShowSizeChart] = useState(false);
+  const chartAvailable = hasSizeChart(product.sizeChart);
 
   // Reset the size selection whenever the active color changes (adjusted during
   // render — the endorsed pattern for reacting to a prop change without effects).
@@ -147,12 +150,15 @@ export default function ProductPurchase({
             <p className="text-sm font-bold uppercase tracking-wide text-navy">
               {t("size")}
             </p>
-            <button
-              type="button"
-              className="text-xs font-extrabold uppercase tracking-wide text-brand underline underline-offset-2 hover:text-brand-dark cursor-pointer"
-            >
-              {t("sizeChart")}
-            </button>
+            {chartAvailable && (
+              <button
+                type="button"
+                onClick={() => setShowSizeChart(true)}
+                className="text-xs font-extrabold uppercase tracking-wide text-brand underline underline-offset-2 hover:text-brand-dark cursor-pointer"
+              >
+                {t("sizeChart")}
+              </button>
+            )}
           </div>
           <div className="flex flex-wrap gap-2">
             {sizesForColor.map(({ size: s, stock }) => {
@@ -247,6 +253,13 @@ export default function ProductPurchase({
           {t("buyNow")}
         </Button>
       </div>
+
+      {showSizeChart && (
+        <SizeChartModal
+          chart={product.sizeChart}
+          onClose={() => setShowSizeChart(false)}
+        />
+      )}
     </div>
   );
 }

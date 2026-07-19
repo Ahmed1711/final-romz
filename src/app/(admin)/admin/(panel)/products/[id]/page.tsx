@@ -19,6 +19,8 @@ const blankProduct: Product = {
   ratingAvg: 0,
   ratingCount: 0,
   sold: 0,
+  sizeChart: { columns: [], rows: [], note: { en: "", ar: "" } },
+  fabricCare: { fabric: { en: "", ar: "" }, care: { en: "", ar: "" } },
 };
 
 export default async function AdminProductEditPage({

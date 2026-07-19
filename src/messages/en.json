@@ -112,6 +112,8 @@
     "lowStock": "Only {count} left",
     "description": "Description",
     "fabricCare": "Fabric & Care",
+    "fabric": "Fabric",
+    "care": "Care",
     "fabricCareBody": "Machine wash cold with similar colors. Do not bleach. Tumble dry low. Do not iron graphics.",
     "shippingReturns": "Shipping & Returns",
     "shippingReturnsBody": "Free shipping on orders over 2,000 EGP. Easy 14-day exchanges and returns across Egypt.",

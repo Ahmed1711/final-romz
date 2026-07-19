@@ -61,6 +61,23 @@ export interface Variant {
 
 export type Badge = "new" | "best-seller" | "sale";
 
+/**
+ * Localized measurement table shown on the product page. Column headers are
+ * localized; row cells are plain strings (e.g. "90" or "90-94"). All parts are
+ * optional — older products may have an empty chart.
+ */
+export interface SizeChart {
+  columns: LocalizedText[];
+  rows: string[][];
+  note: LocalizedText;
+}
+
+/** Localized fabric composition and care instructions. */
+export interface FabricCare {
+  fabric: LocalizedText;
+  care: LocalizedText;
+}
+
 export interface Product {
   id: string;
   slug: string;
@@ -80,6 +97,10 @@ export interface Product {
   ratingAvg: number;
   ratingCount: number;
   sold: number;
+  /** Localized size/measurement table. Empty when unset. */
+  sizeChart: SizeChart;
+  /** Localized fabric composition and care instructions. Empty when unset. */
+  fabricCare: FabricCare;
 }
 
 export interface Review {

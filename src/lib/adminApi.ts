@@ -10,10 +10,12 @@ import type {
   Category,
   ContactMessage,
   ContactStatus,
+  FabricCare,
   Order,
   PageMeta,
   Product,
   ProductImage,
+  SizeChart,
   StorefrontSettings,
   Variant,
 } from "./types";
@@ -229,6 +231,8 @@ export interface ProductPayload {
   imageFileColors?: (string | undefined)[]; // color hex per new file (aligned to imageFiles)
   variants: Variant[];
   isActive: boolean;
+  sizeChart: SizeChart; // localized measurement table (empty chart clears it)
+  fabricCare: FabricCare; // localized fabric + care (empty strings clear it)
 }
 
 function productFormData(
@@ -278,6 +282,29 @@ function productFormData(
         priceOverride: v.priceOverride ?? null,
       }))
     )
+  );
+  // Object fields go as JSON strings — the backend JSON.parses them. Rows are
+  // normalized to the column count so each row matches the header width.
+  const columnCount = payload.sizeChart.columns.length;
+  fd.set(
+    "sizeChart",
+    JSON.stringify({
+      columns: payload.sizeChart.columns,
+      rows:
+        columnCount === 0
+          ? []
+          : payload.sizeChart.rows.map((row) =>
+              Array.from({ length: columnCount }, (_, i) => row[i] ?? "")
+            ),
+      note: payload.sizeChart.note,
+    })
+  );
+  fd.set(
+    "fabricCare",
+    JSON.stringify({
+      fabric: payload.fabricCare.fabric,
+      care: payload.fabricCare.care,
+    })
   );
   fd.set("isActive", String(payload.isActive));
   return fd;

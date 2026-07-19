@@ -29,6 +29,27 @@ export default function ProductView({ product }: { product: Product }) {
     ? Math.round(100 - (product.salePrice / product.basePrice) * 100)
     : undefined;
 
+  // Real fabric/care when the admin set it; otherwise the generic fallback copy.
+  const fabric = lt(product.fabricCare.fabric, locale);
+  const care = lt(product.fabricCare.care, locale);
+  const fabricCareContent =
+    fabric || care ? (
+      <div className="space-y-2">
+        {fabric && (
+          <p>
+            <span className="font-bold text-navy">{t("fabric")}:</span> {fabric}
+          </p>
+        )}
+        {care && (
+          <p>
+            <span className="font-bold text-navy">{t("care")}:</span> {care}
+          </p>
+        )}
+      </div>
+    ) : (
+      t("fabricCareBody")
+    );
+
   return (
     <div className="grid gap-10 lg:grid-cols-2">
       <ProductGallery
@@ -69,7 +90,7 @@ export default function ProductView({ product }: { product: Product }) {
           className="mt-10 border-t border-navy/10"
           items={[
             { title: t("description"), content: lt(product.description, locale) },
-            { title: t("fabricCare"), content: t("fabricCareBody") },
+            { title: t("fabricCare"), content: fabricCareContent },
             { title: t("shippingReturns"), content: t("shippingReturnsBody") },
           ]}
         />

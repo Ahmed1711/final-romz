@@ -200,6 +200,15 @@ interface BeProduct {
   ratingAvg?: number;
   ratingCount?: number;
   sold?: number;
+  sizeChart?: {
+    columns?: BeLocalized[];
+    rows?: unknown[][];
+    note?: BeLocalized;
+  } | null;
+  fabricCare?: {
+    fabric?: BeLocalized;
+    care?: BeLocalized;
+  } | null;
 }
 
 interface BeReview {
@@ -342,6 +351,18 @@ export const mapProduct = (p: BeProduct): Product => {
   ratingAvg: p.ratingAvg ?? 0,
   ratingCount: p.ratingCount ?? 0,
   sold: p.sold ?? 0,
+  sizeChart: {
+    // Map defensively — rows/cells may be missing or non-string on old data.
+    columns: (p.sizeChart?.columns ?? []).map(loc),
+    rows: (p.sizeChart?.rows ?? []).map((row) =>
+      (Array.isArray(row) ? row : []).map((cell) => String(cell ?? ""))
+    ),
+    note: loc(p.sizeChart?.note),
+  },
+  fabricCare: {
+    fabric: loc(p.fabricCare?.fabric),
+    care: loc(p.fabricCare?.care),
+  },
   };
 };
 

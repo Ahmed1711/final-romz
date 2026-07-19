@@ -11,7 +11,14 @@ import {
   updateProduct,
   type ProductPayload,
 } from "@/lib/adminApi";
-import type { Category, Locale, Product, Variant } from "@/lib/types";
+import type {
+  Category,
+  FabricCare,
+  Locale,
+  Product,
+  SizeChart,
+  Variant,
+} from "@/lib/types";
 import { prepareImageUploads } from "@/lib/imageUpload";
 import { SIZE_OPTIONS, orderSizes } from "@/lib/product";
 
@@ -183,6 +190,59 @@ export default function ProductEditor({
   const [colorGroups, setColorGroups] = useState<ColorGroup[]>(() =>
     groupVariants(product.variants)
   );
+
+  // Size chart + fabric/care. Deep-cloned so edits don't mutate the prop.
+  const cloneSizeChart = (sc: SizeChart): SizeChart => ({
+    columns: sc.columns.map((c) => ({ ...c })),
+    rows: sc.rows.map((r) => [...r]),
+    note: { ...sc.note },
+  });
+  const cloneFabricCare = (fc: FabricCare): FabricCare => ({
+    fabric: { ...fc.fabric },
+    care: { ...fc.care },
+  });
+  const [sizeChart, setSizeChart] = useState<SizeChart>(() =>
+    cloneSizeChart(product.sizeChart)
+  );
+  const [fabricCare, setFabricCare] = useState<FabricCare>(() =>
+    cloneFabricCare(product.fabricCare)
+  );
+
+  const addColumn = () =>
+    setSizeChart((sc) => ({
+      ...sc,
+      columns: [...sc.columns, { en: "", ar: "" }],
+      rows: sc.rows.map((r) => [...r, ""]),
+    }));
+  const removeColumn = (ci: number) =>
+    setSizeChart((sc) => ({
+      ...sc,
+      columns: sc.columns.filter((_, i) => i !== ci),
+      rows: sc.rows.map((r) => r.filter((_, i) => i !== ci)),
+    }));
+  const setColumnHeader = (ci: number, value: string) =>
+    setSizeChart((sc) => ({
+      ...sc,
+      columns: sc.columns.map((c, i) =>
+        i === ci ? { ...c, [lang]: value } : c
+      ),
+    }));
+  const addRow = () =>
+    setSizeChart((sc) => ({
+      ...sc,
+      rows: [...sc.rows, sc.columns.map(() => "")],
+    }));
+  const removeRow = (ri: number) =>
+    setSizeChart((sc) => ({ ...sc, rows: sc.rows.filter((_, i) => i !== ri) }));
+  const setCell = (ri: number, ci: number, value: string) =>
+    setSizeChart((sc) => ({
+      ...sc,
+      rows: sc.rows.map((r, i) =>
+        i === ri ? r.map((cell, j) => (j === ci ? value : cell)) : r
+      ),
+    }));
+  const setNote = (value: string) =>
+    setSizeChart((sc) => ({ ...sc, note: { ...sc.note, [lang]: value } }));
 
   // Distinct colors defined across the groups — images are tagged with one of
   // these so the storefront can switch the image when a color is picked.
@@ -394,6 +454,8 @@ export default function ProductEditor({
     imageFileColors,
     variants: flattenVariants(),
     isActive: form.active,
+    sizeChart,
+    fabricCare,
   });
 
   const validate = (): string | null => {
@@ -449,6 +511,8 @@ export default function ProductEditor({
         setImageFiles([]);
         setImageFileColors([]);
         setColorGroups(groupVariants(refreshed.variants));
+        setSizeChart(cloneSizeChart(refreshed.sizeChart));
+        setFabricCare(cloneFabricCare(refreshed.fabricCare));
         setMessage({ kind: "ok", text: "Saved" });
         router.refresh();
       }
@@ -710,6 +774,150 @@ export default function ProductEditor({
                   </p>
                 </div>
               )}
+            </div>
+          </div>
+
+          {/* Size Chart */}
+          <div className="bg-white p-6 shadow-sm">
+            <div className="flex items-center justify-between border-b-2 border-navy pb-2">
+              <h2 className="font-display uppercase text-xl text-navy">
+                Size Chart
+              </h2>
+              <button
+                type="button"
+                onClick={addColumn}
+                className="flex items-center gap-1 text-[11px] font-extrabold uppercase tracking-wider text-brand hover:text-brand-dark cursor-pointer"
+              >
+                <Plus size={13} /> Add Column
+              </button>
+            </div>
+            <p className="mt-1 text-[10px] leading-tight text-muted">
+              Headers are localized (editing{" "}
+              {lang === "ar" ? "العربية" : "English"} — switch the tab above for
+              the other language). Measurement cells are shared. Use ranges like
+              &quot;90-94&quot;.
+            </p>
+
+            {sizeChart.columns.length === 0 ? (
+              <p className="mt-4 text-xs text-muted">
+                No columns yet. Add a column (e.g. Size, Chest, Length) to start
+                the chart.
+              </p>
+            ) : (
+              <div className="mt-4 overflow-x-auto">
+                <table className="w-full border-collapse text-xs">
+                  <thead>
+                    <tr>
+                      {sizeChart.columns.map((c, ci) => (
+                        <th key={ci} className="p-1 align-top">
+                          <input
+                            value={c[lang]}
+                            onChange={(e) => setColumnHeader(ci, e.target.value)}
+                            placeholder={`Header ${ci + 1}`}
+                            dir={lang === "ar" ? "rtl" : "ltr"}
+                            className={clsx(inputCls, "text-xs")}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeColumn(ci)}
+                            className="mt-1 text-[10px] font-bold uppercase tracking-wider text-muted hover:text-brand cursor-pointer"
+                          >
+                            Remove
+                          </button>
+                        </th>
+                      ))}
+                      <th className="w-8" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sizeChart.rows.map((row, ri) => (
+                      <tr key={ri}>
+                        {sizeChart.columns.map((_, ci) => (
+                          <td key={ci} className="p-1">
+                            <input
+                              value={row[ci] ?? ""}
+                              onChange={(e) => setCell(ri, ci, e.target.value)}
+                              dir="ltr"
+                              className={clsx(inputCls, "text-xs")}
+                            />
+                          </td>
+                        ))}
+                        <td className="p-1 text-center">
+                          <button
+                            type="button"
+                            onClick={() => removeRow(ri)}
+                            aria-label="Remove row"
+                            className="p-1 text-muted hover:text-brand cursor-pointer"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <button
+                  type="button"
+                  onClick={addRow}
+                  className="mt-3 flex items-center gap-1 text-[11px] font-extrabold uppercase tracking-wider text-brand hover:text-brand-dark cursor-pointer"
+                >
+                  <Plus size={13} /> Add Row
+                </button>
+                <div className="mt-4" dir={lang === "ar" ? "rtl" : "ltr"}>
+                  <label className={labelCls}>Note (optional caption)</label>
+                  <input
+                    value={sizeChart.note[lang]}
+                    onChange={(e) => setNote(e.target.value)}
+                    placeholder="e.g. Measurements in cm"
+                    className={inputCls}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Fabric & Care */}
+          <div className="bg-white p-6 shadow-sm">
+            <h2 className="border-b-2 border-navy pb-2 font-display uppercase text-xl text-navy">
+              Fabric &amp; Care
+            </h2>
+            <p className="mt-1 text-[10px] leading-tight text-muted">
+              Localized — editing {lang === "ar" ? "العربية" : "English"}. Switch
+              the tab above for the other language.
+            </p>
+            <div className="mt-4 space-y-4" dir={lang === "ar" ? "rtl" : "ltr"}>
+              <div>
+                <label className={labelCls}>Fabric (composition)</label>
+                <textarea
+                  rows={2}
+                  value={fabricCare.fabric[lang]}
+                  onChange={(e) =>
+                    setFabricCare((fc) => ({
+                      ...fc,
+                      fabric: { ...fc.fabric, [lang]: e.target.value },
+                    }))
+                  }
+                  placeholder={lang === "ar" ? "مثال: 100% قطن" : "e.g. 100% Cotton"}
+                  className={inputCls}
+                />
+              </div>
+              <div>
+                <label className={labelCls}>Care instructions</label>
+                <textarea
+                  rows={2}
+                  value={fabricCare.care[lang]}
+                  onChange={(e) =>
+                    setFabricCare((fc) => ({
+                      ...fc,
+                      care: { ...fc.care, [lang]: e.target.value },
+                    }))
+                  }
+                  placeholder={
+                    lang === "ar" ? "مثال: غسيل بارد" : "e.g. Machine wash cold"
+                  }
+                  className={inputCls}
+                />
+              </div>
             </div>
           </div>
         </div>
