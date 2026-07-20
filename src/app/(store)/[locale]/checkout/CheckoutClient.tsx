@@ -27,6 +27,7 @@ interface FormState {
   firstName: string;
   lastName: string;
   address: string;
+  apartment: string;
   city: string;
   governorate: string;
   phone: string;
@@ -38,6 +39,7 @@ const initialForm: FormState = {
   firstName: "",
   lastName: "",
   address: "",
+  apartment: "",
   city: "",
   governorate: "",
   phone: "",
@@ -316,6 +318,8 @@ export default function CheckoutClient({
               governorate: zone.governorate.en,
               city: form.city,
               street: form.address,
+              // Optional on the backend; omit when the customer leaves it blank.
+              apartment: form.apartment.trim() || undefined,
             },
             items: validatedCart.items.map((item) => ({
               product: item.product,
@@ -527,6 +531,14 @@ export default function CheckoutClient({
               {errors.address && (
                 <p className="mt-1 text-xs text-brand">{t("required")}</p>
               )}
+            </div>
+            <div>
+              <input
+                placeholder={t("apartment")}
+                value={form.apartment}
+                onChange={(e) => set("apartment", e.target.value)}
+                className={inputCls}
+              />
             </div>
             <div className="grid gap-5 sm:grid-cols-2">
               <div>

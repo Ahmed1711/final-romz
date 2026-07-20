@@ -147,6 +147,7 @@
     "firstName": "First name",
     "lastName": "Last name",
     "address": "Address",
+    "apartment": "Apartment / building (optional)",
     "city": "City",
     "governorate": "Governorate",
     "phone": "Phone",
