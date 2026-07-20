@@ -600,30 +600,36 @@ export async function updateOrderStatus(
 // Bearer token and refresh-once behavior are applied consistently.
 
 export interface MylerzWarehouse {
-  warehouseName: string;
-  name?: string;
+  /** Mylerz warehouse name (.Name) — sent back as `warehouseName` on a shipment. */
+  name: string;
 }
 
-export interface MylerzCityZone {
-  cityCode: string;
-  cityName?: string;
-  city?: string;
-  governorate?: string;
-  neighborhoodCode: string;
-  neighborhoodName?: string;
-  districtCode: string;
-  districtName?: string;
+/** A delivery zone (neighborhood) inside a Mylerz city. */
+export interface MylerzZone {
+  code: string;
+  enName: string;
+  arName: string;
 }
 
-// Every field is an optional override. Per the courier API, the shipment body
-// is fully optional — the backend fills the customer address, weight, payment,
-// and service defaults from the order itself, so an empty body ships the order
-// as-is. Send a field only to override its default.
+/**
+ * A Mylerz city with its nested delivery zones (from CityDTO). The shipment
+ * needs the city `.Code` as cityCode and the selected zone `.Code` as
+ * neighborhoodCode — free-text city/governorate is rejected by Mylerz.
+ */
+export interface MylerzCity {
+  code: string;
+  enName: string;
+  arName: string;
+  zones: MylerzZone[];
+}
+
+// Per the courier API, cityCode + neighborhoodCode must be real Mylerz codes;
+// omitting them falls back to the order's free-text address, which usually
+// fails Mylerz validation. warehouseName defaults to the account's warehouse.
 export interface MylerzShipmentPayload {
   warehouseName?: string;
   cityCode?: string;
   neighborhoodCode?: string;
-  districtCode?: string;
   totalWeight?: number;
   dimensions?: {
     length: number;
@@ -631,6 +637,23 @@ export interface MylerzShipmentPayload {
     height: number;
   };
   specialNotes?: string;
+}
+
+export interface MylerzExpectedChargesInput {
+  /** Cash to collect — the order total for COD, 0 for prepaid. */
+  codValue: number;
+  warehouseName: string;
+  /** Mylerz zone (.Code) the parcel is delivered to. */
+  customerZoneCode: string;
+  packageWeight: number;
+  paymentTypeCode: "COD" | "PP";
+}
+
+export interface MylerzCharges {
+  shippingFees: number;
+  vat: number;
+  totalTransfer: number;
+  codValue: number;
 }
 
 export interface MylerzShipmentResult {
@@ -678,29 +701,72 @@ function courierFromResponse(data: Record<string, unknown>): Order["courier"] {
 }
 
 export async function getMylerzWarehouses(): Promise<MylerzWarehouse[]> {
-  const data = await adminFetch<MaybeList<MylerzWarehouse>>(
+  const data = await adminFetch<MaybeList<Record<string, unknown>>>(
     "/couriers/mylerz/warehouses",
     { method: "GET" }
   );
-  return listFromResponse<MylerzWarehouse>(data, ["warehouses", "items"]).map((w) => ({
-    ...w,
-    warehouseName:
-      w.warehouseName ??
-      (w as { name?: string }).name ??
-      String(w),
-  }));
+  return listFromResponse<Record<string, unknown>>(data, ["warehouses", "items"])
+    .map((w) => ({
+      name: String(w.Name ?? w.name ?? w.warehouseName ?? ""),
+    }))
+    .filter((w) => w.name.length > 0);
 }
 
-export async function getMylerzCityZones(): Promise<MylerzCityZone[]> {
-  const data = await adminFetch<MaybeList<MylerzCityZone>>(
+export async function getMylerzCityZones(): Promise<MylerzCity[]> {
+  const data = await adminFetch<MaybeList<Record<string, unknown>>>(
     "/couriers/mylerz/city-zones",
     { method: "GET" }
   );
-  return listFromResponse<MylerzCityZone>(data, [
-    "cityZones",
+  const cities = listFromResponse<Record<string, unknown>>(data, [
     "zones",
+    "cityZones",
     "items",
   ]);
+  return cities
+    .map((c) => ({
+      code: String(c.Code ?? ""),
+      enName: String(c.EnName ?? c.Code ?? ""),
+      arName: String(c.ArName ?? ""),
+      zones: Array.isArray(c.Zones)
+        ? (c.Zones as Record<string, unknown>[])
+            .map((z) => ({
+              code: String(z.Code ?? ""),
+              enName: String(z.EnName ?? z.Code ?? ""),
+              arName: String(z.ArName ?? ""),
+            }))
+            .filter((z) => z.code.length > 0)
+        : [],
+    }))
+    .filter((c) => c.code.length > 0);
+}
+
+export async function getMylerzExpectedCharges(
+  input: MylerzExpectedChargesInput
+): Promise<MylerzCharges> {
+  const data = await adminFetch<{ charges?: Record<string, unknown> }>(
+    "/couriers/mylerz/expected-charges",
+    {
+      method: "POST",
+      json: {
+        codValue: input.codValue,
+        warehouseName: input.warehouseName,
+        customerZoneCode: input.customerZoneCode,
+        packageWeight: input.packageWeight,
+        isFulfillment: false,
+        packageServiceTypeCode: "DTD",
+        packageServiceCode: "ND",
+        paymentTypeCode: input.paymentTypeCode,
+        serviceCategoryCode: "DELIVERY",
+      },
+    }
+  );
+  const c = data.charges ?? {};
+  return {
+    shippingFees: Number(c.ShippingFees ?? 0),
+    vat: Number(c.VAT ?? 0),
+    totalTransfer: Number(c.TotalTransfer ?? 0),
+    codValue: Number(c.CODValue ?? 0),
+  };
 }
 
 export async function createMylerzShipment(
@@ -713,7 +779,6 @@ export async function createMylerzShipment(
   if (overrides.warehouseName) body.warehouseName = overrides.warehouseName;
   if (overrides.cityCode) body.cityCode = overrides.cityCode;
   if (overrides.neighborhoodCode) body.neighborhoodCode = overrides.neighborhoodCode;
-  if (overrides.districtCode) body.districtCode = overrides.districtCode;
   if (typeof overrides.totalWeight === "number") {
     body.totalWeight = overrides.totalWeight;
   }

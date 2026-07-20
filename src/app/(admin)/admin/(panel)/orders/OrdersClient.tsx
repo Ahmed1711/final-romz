@@ -23,13 +23,15 @@ import {
   cancelMylerzPackage,
   createMylerzShipment,
   getMylerzCityZones,
+  getMylerzExpectedCharges,
   getMylerzPackageDetails,
   getMylerzPackageStatus,
   getMylerzPackageTracking,
   getMylerzPackageTrackingUrl,
   getMylerzWarehouses,
   updateOrderStatus,
-  type MylerzCityZone,
+  type MylerzCharges,
+  type MylerzCity,
   type MylerzShipmentPayload,
   type MylerzWarehouse,
 } from "@/lib/adminApi";
@@ -516,21 +518,8 @@ const shipmentInputCls =
 const shipmentLabelCls =
   "mb-1 block text-[10px] font-extrabold uppercase tracking-wider text-muted";
 
-const zoneKey = (zone: MylerzCityZone) =>
-  `${zone.cityCode}|${zone.neighborhoodCode}|${zone.districtCode}`;
-
-const zoneLabel = (zone: MylerzCityZone) =>
-  [
-    zone.governorate,
-    zone.cityName ?? zone.city,
-    zone.neighborhoodName,
-    zone.districtName,
-    `City ${zone.cityCode}`,
-    `Area ${zone.neighborhoodCode}`,
-    `District ${zone.districtCode}`,
-  ]
-    .filter(Boolean)
-    .join(" - ");
+const optionLabel = (enName: string, arName: string) =>
+  arName ? `${enName} — ${arName}` : enName;
 
 const resultText = (value: unknown) =>
   typeof value === "string"
@@ -558,39 +547,47 @@ function MylerzPanel({
   onOrderPatch: (patch: Partial<Order>) => void;
 }) {
   const [warehouses, setWarehouses] = useState<MylerzWarehouse[]>([]);
-  const [zones, setZones] = useState<MylerzCityZone[]>([]);
+  const [cities, setCities] = useState<MylerzCity[]>([]);
   const [warehouseName, setWarehouseName] = useState("");
-  const [zone, setZone] = useState("");
+  const [cityCode, setCityCode] = useState("");
+  const [zoneCode, setZoneCode] = useState("");
   const [weight, setWeight] = useState(1);
   const [length, setLength] = useState(20);
   const [width, setWidth] = useState(20);
   const [height, setHeight] = useState(10);
   const [notes, setNotes] = useState("");
   const [loadingConfig, setLoadingConfig] = useState(true);
+  const [configError, setConfigError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [actionResult, setActionResult] = useState<string | null>(null);
+  const [charges, setCharges] = useState<MylerzCharges | null>(null);
 
   const awb = order.courier?.trackingNumber ?? "";
-  const selectedZone = zones.find((z) => zoneKey(z) === zone);
+  const isCod = order.paymentMethod === "cod";
+  const selectedCity = cities.find((c) => c.code === cityCode);
+  const zoneOptions = selectedCity?.zones ?? [];
+  // Mylerz rejects free-text addresses, so a city + zone code is required.
+  const canShip = Boolean(cityCode && zoneCode);
 
   useEffect(() => {
-    // Warehouses and zones only power the optional override dropdowns — a load
-    // failure must not block shipping, since the backend can ship from the
-    // order alone.
+    // The panel is keyed by order id and remounts per order, so the initial
+    // loading/error state is already fresh — no synchronous reset needed here.
     let alive = true;
     Promise.all([getMylerzWarehouses(), getMylerzCityZones()])
-      .then(([warehouseList, zoneList]) => {
+      .then(([warehouseList, cityList]) => {
         if (!alive) return;
         setWarehouses(warehouseList);
-        setZones(zoneList);
+        setCities(cityList);
+        // Default to the account's warehouse (usually the only one).
+        if (warehouseList[0]) setWarehouseName(warehouseList[0].name);
       })
       .catch((error) => {
         if (!alive) return;
-        setMessage(
+        setConfigError(
           error instanceof Error
-            ? `Optional Mylerz lookups unavailable: ${error.message}`
-            : "Optional Mylerz lookups unavailable."
+            ? `Could not load Mylerz cities/warehouses: ${error.message}`
+            : "Could not load Mylerz cities/warehouses."
         );
       })
       .finally(() => {
@@ -601,26 +598,51 @@ function MylerzPanel({
     };
   }, [order.id]);
 
+  // Reset the zone whenever the city changes so a stale zone is never sent.
+  const selectCity = (code: string) => {
+    setCityCode(code);
+    setZoneCode("");
+    setCharges(null);
+  };
+
+  const previewFee = async () => {
+    if (!canShip || !warehouseName) return;
+    setBusy("charges");
+    setMessage(null);
+    try {
+      const result = await getMylerzExpectedCharges({
+        codValue: isCod ? order.total : 0,
+        warehouseName,
+        customerZoneCode: zoneCode,
+        packageWeight: weight,
+        paymentTypeCode: isCod ? "COD" : "PP",
+      });
+      setCharges(result);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Fee preview failed.");
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const createShipment = async () => {
+    if (!canShip) {
+      setMessage("Pick a city and zone before creating the shipment.");
+      return;
+    }
     setBusy("shipment");
     setMessage(null);
     setActionResult(null);
     try {
-      // Everything is an optional override. The backend fills the customer
-      // address and payment from the order; we send package weight/dimensions
-      // and only include a warehouse/zone/notes when the admin picked one.
+      // Send the real Mylerz codes for the destination; the backend fills the
+      // customer contact and payment (COD/PP) from the order itself.
       const overrides: MylerzShipmentPayload = {
+        warehouseName: warehouseName || undefined,
+        cityCode,
+        neighborhoodCode: zoneCode,
         totalWeight: weight,
         dimensions: { length, width, height },
       };
-      if (warehouseName) overrides.warehouseName = warehouseName;
-      if (selectedZone) {
-        overrides.cityCode = selectedZone.cityCode;
-        overrides.neighborhoodCode = selectedZone.neighborhoodCode;
-        if (selectedZone.districtCode) {
-          overrides.districtCode = selectedZone.districtCode;
-        }
-      }
       if (notes.trim()) overrides.specialNotes = notes.trim();
 
       const result = await createMylerzShipment(order.id, overrides);
@@ -703,49 +725,78 @@ function MylerzPanel({
         order.status !== "returned" && (
           <div className="mt-4 space-y-3 bg-surface p-4">
             <p className="text-[10px] leading-tight text-muted">
-              Warehouse and zone are optional — leave them to ship using the
-              order&apos;s own address and the server defaults.
+              Pick the Mylerz city and zone that match the customer&apos;s
+              address. These codes are required — Mylerz rejects the free-text
+              address on its own.
             </p>
 
+            {configError && (
+              <p className="border-s-4 border-brand bg-brand/5 p-2 text-[11px] font-bold text-brand">
+                {configError}
+              </p>
+            )}
+
             <div>
-              <label className={shipmentLabelCls}>Warehouse (optional)</label>
+              <label className={shipmentLabelCls}>Warehouse</label>
               <select
                 value={warehouseName}
                 onChange={(e) => setWarehouseName(e.target.value)}
                 className={shipmentInputCls}
                 disabled={loadingConfig}
               >
-                <option value="">Server default warehouse</option>
+                {warehouses.length === 0 && (
+                  <option value="">Server default warehouse</option>
+                )}
                 {warehouses.map((warehouse) => (
-                  <option
-                    key={warehouse.warehouseName}
-                    value={warehouse.warehouseName}
-                  >
-                    {warehouse.warehouseName}
+                  <option key={warehouse.name} value={warehouse.name}>
+                    {warehouse.name}
                   </option>
                 ))}
               </select>
             </div>
 
-            <div>
-              <label className={shipmentLabelCls}>
-                Override delivery zone (optional)
-              </label>
-              <div className="flex items-center gap-2">
-                <MapPin size={14} className="shrink-0 text-brand" />
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className={shipmentLabelCls}>City *</label>
                 <select
-                  value={zone}
-                  onChange={(e) => setZone(e.target.value)}
+                  value={cityCode}
+                  onChange={(e) => selectCity(e.target.value)}
                   className={shipmentInputCls}
                   disabled={loadingConfig}
                 >
-                  <option value="">Use order&apos;s address</option>
-                  {zones.map((z) => (
-                    <option key={zoneKey(z)} value={zoneKey(z)}>
-                      {zoneLabel(z)}
+                  <option value="">
+                    {loadingConfig ? "Loading…" : "Select city"}
+                  </option>
+                  {cities.map((c) => (
+                    <option key={c.code} value={c.code}>
+                      {optionLabel(c.enName, c.arName)}
                     </option>
                   ))}
                 </select>
+              </div>
+              <div>
+                <label className={shipmentLabelCls}>Zone *</label>
+                <div className="flex items-center gap-1.5">
+                  <MapPin size={14} className="shrink-0 text-brand" />
+                  <select
+                    value={zoneCode}
+                    onChange={(e) => {
+                      setZoneCode(e.target.value);
+                      setCharges(null);
+                    }}
+                    className={shipmentInputCls}
+                    disabled={!selectedCity}
+                  >
+                    <option value="">
+                      {selectedCity ? "Select zone" : "Pick city first"}
+                    </option>
+                    {zoneOptions.map((z) => (
+                      <option key={z.code} value={z.code}>
+                        {optionLabel(z.enName, z.arName)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
             </div>
 
@@ -777,14 +828,49 @@ function MylerzPanel({
             </div>
 
             <button
+              onClick={previewFee}
+              disabled={!canShip || !warehouseName || busy === "charges"}
+              className="w-full border-2 border-navy/15 px-3 py-2 text-xs font-extrabold uppercase tracking-wider text-navy hover:border-brand hover:text-brand transition-colors cursor-pointer disabled:opacity-50"
+            >
+              {busy === "charges" ? "Checking…" : "Preview shipping fee"}
+            </button>
+
+            {charges && (
+              <div className="grid gap-1 border-s-4 border-navy bg-white p-3 text-[11px]">
+                <div className="flex justify-between">
+                  <span className="text-muted">Shipping fee</span>
+                  <span className="font-extrabold text-navy">
+                    {charges.shippingFees.toLocaleString()} EGP
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted">VAT</span>
+                  <span className="text-navy">
+                    {charges.vat.toLocaleString()} EGP
+                  </span>
+                </div>
+                {isCod && (
+                  <div className="flex justify-between border-t border-navy/10 pt-1">
+                    <span className="text-muted">Net transfer (COD)</span>
+                    <span className="font-extrabold text-brand">
+                      {charges.totalTransfer.toLocaleString()} EGP
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <button
               onClick={createShipment}
-              disabled={busy === "shipment"}
+              disabled={busy === "shipment" || !canShip}
               className="skew-cta w-full bg-navy py-3 text-xs font-display uppercase tracking-wider text-white hover:bg-navy-deep transition-colors cursor-pointer disabled:opacity-50"
             >
               <span>
                 {busy === "shipment"
                   ? "Creating..."
-                  : "Create Mylerz Shipment"}
+                  : canShip
+                    ? "Create Mylerz Shipment"
+                    : "Select city & zone"}
               </span>
             </button>
           </div>
