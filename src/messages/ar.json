@@ -152,6 +152,8 @@
     "phone": "رقم الموبايل",
     "shippingMethod": "طريقة الشحن",
     "shippingDays": "الشحن ({days} أيام عمل)",
+    "selectGovernorate": "اختر محافظتك بالأعلى لعرض مدة وتكلفة التوصيل.",
+    "noShippingZones": "الشحن غير متاح حالياً. برجاء المحاولة لاحقاً.",
     "freeShipping": "مجاني",
     "payment": "الدفع",
     "card": "بطاقة ائتمان / خصم",

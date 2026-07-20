@@ -117,6 +117,8 @@ export interface ShippingZone {
   governorate: LocalizedText;
   fee: number;
   estimatedDays: string;
+  /** Inactive zones are hidden from checkout but still shown in the admin. */
+  isActive: boolean;
 }
 
 export interface Coupon {

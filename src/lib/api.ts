@@ -226,6 +226,7 @@ interface BeShippingZone {
   governorate: string;
   fee: number;
   estimatedDays?: string;
+  isActive?: boolean;
 }
 
 interface BeOrderItem {
@@ -383,6 +384,8 @@ const mapShippingZone = (z: BeShippingZone): ShippingZone => ({
   governorate: loc(z.governorate),
   fee: z.fee,
   estimatedDays: z.estimatedDays ?? "1-3",
+  // Older zones created before the isActive field default to active.
+  isActive: z.isActive ?? true,
 });
 
 const mapOrder = (o: BeOrder): Order => ({

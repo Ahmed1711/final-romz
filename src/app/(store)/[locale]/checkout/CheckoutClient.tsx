@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { AlertCircle, CreditCard, Banknote, Lock } from "lucide-react";
+import { AlertCircle, CreditCard, Banknote, Lock, Truck } from "lucide-react";
 import clsx from "clsx";
 import { Link } from "@/i18n/navigation";
 import { useCart } from "@/components/cart/CartProvider";
@@ -133,7 +133,9 @@ export default function CheckoutClient({
     contact: string;
   } | null>(null);
 
-  const zone = zones.find((z) => z.id === form.governorate);
+  // Only active zones can be shipped to — inactive zones are hidden from checkout.
+  const activeZones = useMemo(() => zones.filter((z) => z.isActive), [zones]);
+  const zone = activeZones.find((z) => z.id === form.governorate);
   const backendTotal = validatedCart?.total ?? 0;
   const shippingFee =
     zone && validatedCart
@@ -549,7 +551,7 @@ export default function CheckoutClient({
                   )}
                 >
                   <option value="">{t("governorate")}</option>
-                  {zones.map((z) => (
+                  {activeZones.map((z) => (
                     <option key={z.id} value={z.id}>
                       {lt(z.governorate, locale)}
                     </option>
@@ -579,23 +581,45 @@ export default function CheckoutClient({
         </Section>
 
         <Section title={t("shippingMethod")}>
-          <div className="flex items-center justify-between border-2 border-brand bg-white px-4 py-3.5">
-            <div className="flex items-center gap-3">
-              <span className="flex h-5 w-5 items-center justify-center rounded-full border-2 border-brand">
-                <span className="h-2.5 w-2.5 rounded-full bg-brand" />
-              </span>
-              <span className="text-sm font-bold text-navy">
-                {t("shippingDays", { days: zone?.estimatedDays ?? "1-3" })}
+          {activeZones.length === 0 ? (
+            <div className="flex items-center gap-3 border-2 border-navy/10 bg-surface px-4 py-3.5 text-sm text-muted">
+              <Truck size={20} className="shrink-0" />
+              <span>{t("noShippingZones")}</span>
+            </div>
+          ) : !zone ? (
+            <div className="flex items-center gap-3 border-2 border-dashed border-navy/25 bg-white px-4 py-3.5 text-sm text-muted">
+              <Truck size={20} className="shrink-0" />
+              <span>{t("selectGovernorate")}</span>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between border-2 border-brand bg-white px-4 py-3.5">
+              <div className="flex items-center gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center bg-brand/10 text-brand">
+                  <Truck size={20} />
+                </span>
+                <div className="text-start">
+                  <p className="text-sm font-bold text-navy">
+                    {lt(zone.governorate, locale)}
+                  </p>
+                  <p className="text-xs text-muted">
+                    {t("shippingDays", { days: zone.estimatedDays })}
+                  </p>
+                </div>
+              </div>
+              <span
+                className={clsx(
+                  "text-sm font-extrabold",
+                  shippingFee === 0 ? "text-brand" : "text-navy"
+                )}
+              >
+                {shippingFee !== null
+                  ? shippingFee === 0
+                    ? t("freeShipping")
+                    : formatEGP(shippingFee, locale)
+                  : "—"}
               </span>
             </div>
-            <span className="text-sm font-extrabold text-navy">
-              {zone && shippingFee !== null
-                ? shippingFee === 0
-                  ? t("freeShipping")
-                  : formatEGP(shippingFee ?? 0, locale)
-                : "—"}
-            </span>
-          </div>
+          )}
         </Section>
 
         <Section title={t("payment")}>

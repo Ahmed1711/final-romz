@@ -152,6 +152,8 @@
     "phone": "Phone",
     "shippingMethod": "Shipping Method",
     "shippingDays": "Shipping ({days} Working Days)",
+    "selectGovernorate": "Select your governorate above to see delivery time and cost.",
+    "noShippingZones": "Shipping is not available right now. Please try again later.",
     "freeShipping": "Free",
     "payment": "Payment",
     "card": "Credit / Debit Card",
