@@ -135,7 +135,8 @@
     "checkout": "إتمام الطلب",
     "remove": "حذف",
     "shippingNote": "الشحن بيتحسب عند إتمام الطلب",
-    "suggestionsTitle": "قد يعجبك أيضاً"
+    "suggestionsTitle": "قد يعجبك أيضاً",
+    "continueShopping": "مواصلة التسوق"
   },
   "checkout": {
     "title": "إتمام الطلب",

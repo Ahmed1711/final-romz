@@ -135,7 +135,8 @@
     "checkout": "Checkout",
     "remove": "Remove",
     "shippingNote": "Shipping calculated at checkout",
-    "suggestionsTitle": "You May Also Like"
+    "suggestionsTitle": "You May Also Like",
+    "continueShopping": "Continue Shopping"
   },
   "checkout": {
     "title": "Checkout",

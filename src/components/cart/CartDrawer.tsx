@@ -138,6 +138,12 @@ export default function CartDrawer() {
                 </span>
               </div>
               <p className="mb-4 text-xs text-muted">{t("shippingNote")}</p>
+              <button
+                onClick={() => setOpen(false)}
+                className={btn("outline", "lg", "mb-3 w-full")}
+              >
+                <span>{t("continueShopping")}</span>
+              </button>
               <Link
                 href="/checkout"
                 onClick={() => setOpen(false)}
