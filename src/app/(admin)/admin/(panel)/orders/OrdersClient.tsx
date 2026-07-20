@@ -521,6 +521,11 @@ const shipmentLabelCls =
 const optionLabel = (enName: string, arName: string) =>
   arName ? `${enName} — ${arName}` : enName;
 
+// Mylerz rejects the shipment (INPUT_INVALID) unless the recipient mobile is a
+// valid Egyptian number: 11 digits starting 01, optionally with a +20/20 prefix.
+const isValidEgyptMobile = (raw: string) =>
+  /^(?:\+?20|0)1[0125]\d{8}$/.test(raw.replace(/[\s()-]/g, ""));
+
 const resultText = (value: unknown) =>
   typeof value === "string"
     ? value
@@ -567,8 +572,10 @@ function MylerzPanel({
   const isCod = order.paymentMethod === "cod";
   const selectedCity = cities.find((c) => c.code === cityCode);
   const zoneOptions = selectedCity?.zones ?? [];
-  // Mylerz rejects free-text addresses, so a city + zone code is required.
-  const canShip = Boolean(cityCode && zoneCode);
+  const phoneOk = isValidEgyptMobile(order.customer.phone);
+  // Mylerz rejects free-text addresses and invalid mobiles, so a city + zone
+  // code and a valid recipient phone are required before shipping.
+  const canShip = Boolean(cityCode && zoneCode) && phoneOk;
 
   useEffect(() => {
     // The panel is keyed by order id and remounts per order, so the initial
@@ -626,6 +633,10 @@ function MylerzPanel({
   };
 
   const createShipment = async () => {
+    if (!phoneOk) {
+      setMessage("The order's recipient phone must be a valid Egyptian mobile.");
+      return;
+    }
     if (!canShip) {
       setMessage("Pick a city and zone before creating the shipment.");
       return;
@@ -733,6 +744,18 @@ function MylerzPanel({
             {configError && (
               <p className="border-s-4 border-brand bg-brand/5 p-2 text-[11px] font-bold text-brand">
                 {configError}
+              </p>
+            )}
+
+            {!phoneOk && (
+              <p className="border-s-4 border-brand bg-brand/5 p-2 text-[11px] leading-tight text-brand">
+                <span className="font-extrabold uppercase">Invalid phone.</span>{" "}
+                The recipient number{" "}
+                <span className="font-mono" dir="ltr">
+                  {order.customer.phone || "—"}
+                </span>{" "}
+                isn&apos;t a valid Egyptian mobile (01XXXXXXXXX). Mylerz will
+                reject the shipment — fix the order&apos;s phone first.
               </p>
             )}
 
@@ -868,9 +891,11 @@ function MylerzPanel({
               <span>
                 {busy === "shipment"
                   ? "Creating..."
-                  : canShip
-                    ? "Create Mylerz Shipment"
-                    : "Select city & zone"}
+                  : !phoneOk
+                    ? "Fix recipient phone first"
+                    : canShip
+                      ? "Create Mylerz Shipment"
+                      : "Select city & zone"}
               </span>
             </button>
           </div>
