@@ -615,18 +615,22 @@ export interface MylerzCityZone {
   districtName?: string;
 }
 
+// Every field is an optional override. Per the courier API, the shipment body
+// is fully optional — the backend fills the customer address, weight, payment,
+// and service defaults from the order itself, so an empty body ships the order
+// as-is. Send a field only to override its default.
 export interface MylerzShipmentPayload {
-  warehouseName: string;
-  cityCode: string;
-  neighborhoodCode: string;
-  districtCode: string;
-  weight: number;
-  dimensions: {
+  warehouseName?: string;
+  cityCode?: string;
+  neighborhoodCode?: string;
+  districtCode?: string;
+  totalWeight?: number;
+  dimensions?: {
     length: number;
     width: number;
     height: number;
   };
-  notes?: string;
+  specialNotes?: string;
 }
 
 export interface MylerzShipmentResult {
@@ -701,22 +705,27 @@ export async function getMylerzCityZones(): Promise<MylerzCityZone[]> {
 
 export async function createMylerzShipment(
   orderId: string,
-  payload: MylerzShipmentPayload
+  overrides: MylerzShipmentPayload = {}
 ): Promise<MylerzShipmentResult> {
+  // Only forward fields the admin actually set, so anything left blank falls
+  // back to the backend's order-derived default (an empty body ships as-is).
+  const body: Record<string, unknown> = {};
+  if (overrides.warehouseName) body.warehouseName = overrides.warehouseName;
+  if (overrides.cityCode) body.cityCode = overrides.cityCode;
+  if (overrides.neighborhoodCode) body.neighborhoodCode = overrides.neighborhoodCode;
+  if (overrides.districtCode) body.districtCode = overrides.districtCode;
+  if (typeof overrides.totalWeight === "number") {
+    body.totalWeight = overrides.totalWeight;
+  }
+  if (overrides.dimensions) {
+    const { length, width, height } = overrides.dimensions;
+    body.dimensions = `${length}*${width}*${height}`;
+  }
+  if (overrides.specialNotes) body.specialNotes = overrides.specialNotes;
+
   const data = await adminFetch<Record<string, unknown>>(
     `/couriers/mylerz/orders/${encodeURIComponent(orderId)}/shipment`,
-    {
-      method: "POST",
-      json: {
-        warehouseName: payload.warehouseName,
-        cityCode: payload.cityCode,
-        neighborhoodCode: payload.neighborhoodCode,
-        districtCode: payload.districtCode,
-        totalWeight: payload.weight,
-        dimensions: `${payload.dimensions.length}*${payload.dimensions.width}*${payload.dimensions.height}`,
-        ...(payload.notes ? { specialNotes: payload.notes } : {}),
-      },
-    }
+    { method: "POST", json: body }
   );
   return { courier: courierFromResponse(data) };
 }

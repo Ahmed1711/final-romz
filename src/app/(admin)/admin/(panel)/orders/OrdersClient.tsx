@@ -30,6 +30,7 @@ import {
   getMylerzWarehouses,
   updateOrderStatus,
   type MylerzCityZone,
+  type MylerzShipmentPayload,
   type MylerzWarehouse,
 } from "@/lib/adminApi";
 import type { Order, OrderStatus } from "@/lib/types";
@@ -515,9 +516,6 @@ const shipmentInputCls =
 const shipmentLabelCls =
   "mb-1 block text-[10px] font-extrabold uppercase tracking-wider text-muted";
 
-const normalizeText = (value: string | undefined) =>
-  (value ?? "").trim().toLowerCase();
-
 const zoneKey = (zone: MylerzCityZone) =>
   `${zone.cityCode}|${zone.neighborhoodCode}|${zone.districtCode}`;
 
@@ -577,53 +575,22 @@ function MylerzPanel({
   const selectedZone = zones.find((z) => zoneKey(z) === zone);
 
   useEffect(() => {
+    // Warehouses and zones only power the optional override dropdowns — a load
+    // failure must not block shipping, since the backend can ship from the
+    // order alone.
     let alive = true;
     Promise.all([getMylerzWarehouses(), getMylerzCityZones()])
       .then(([warehouseList, zoneList]) => {
         if (!alive) return;
         setWarehouses(warehouseList);
         setZones(zoneList);
-        setWarehouseName((current) => current || warehouseList[0]?.warehouseName || "");
-
-        const city = normalizeText(order.shippingAddress.city);
-        const governorate = normalizeText(order.shippingAddress.governorate);
-        const matched =
-          zoneList.find((z) => {
-            const haystack = normalizeText(
-              [
-                z.governorate,
-                z.cityName,
-                z.city,
-                z.neighborhoodName,
-                z.districtName,
-              ]
-                .filter(Boolean)
-                .join(" ")
-            );
-            return Boolean(
-              city &&
-                governorate &&
-                haystack.includes(city) &&
-                haystack.includes(governorate)
-            );
-          }) ??
-          zoneList.find((z) => {
-            const haystack = normalizeText(
-              [z.cityName, z.city, z.neighborhoodName, z.districtName]
-                .filter(Boolean)
-                .join(" ")
-            );
-            return Boolean(city && haystack.includes(city));
-          }) ??
-          zoneList.find((z) =>
-            Boolean(governorate && normalizeText(z.governorate).includes(governorate))
-          );
-        setZone((current) => current || (matched ? zoneKey(matched) : ""));
       })
       .catch((error) => {
         if (!alive) return;
         setMessage(
-          error instanceof Error ? error.message : "Could not load Mylerz setup."
+          error instanceof Error
+            ? `Optional Mylerz lookups unavailable: ${error.message}`
+            : "Optional Mylerz lookups unavailable."
         );
       })
       .finally(() => {
@@ -632,26 +599,31 @@ function MylerzPanel({
     return () => {
       alive = false;
     };
-  }, [order.id, order.shippingAddress.city, order.shippingAddress.governorate]);
+  }, [order.id]);
 
   const createShipment = async () => {
-    if (!warehouseName || !selectedZone) {
-      setMessage("Choose a warehouse and Mylerz city zone first.");
-      return;
-    }
     setBusy("shipment");
     setMessage(null);
     setActionResult(null);
     try {
-      const result = await createMylerzShipment(order.id, {
-        warehouseName,
-        cityCode: selectedZone.cityCode,
-        neighborhoodCode: selectedZone.neighborhoodCode,
-        districtCode: selectedZone.districtCode,
-        weight,
+      // Everything is an optional override. The backend fills the customer
+      // address and payment from the order; we send package weight/dimensions
+      // and only include a warehouse/zone/notes when the admin picked one.
+      const overrides: MylerzShipmentPayload = {
+        totalWeight: weight,
         dimensions: { length, width, height },
-        ...(notes.trim() ? { notes: notes.trim() } : {}),
-      });
+      };
+      if (warehouseName) overrides.warehouseName = warehouseName;
+      if (selectedZone) {
+        overrides.cityCode = selectedZone.cityCode;
+        overrides.neighborhoodCode = selectedZone.neighborhoodCode;
+        if (selectedZone.districtCode) {
+          overrides.districtCode = selectedZone.districtCode;
+        }
+      }
+      if (notes.trim()) overrides.specialNotes = notes.trim();
+
+      const result = await createMylerzShipment(order.id, overrides);
       onOrderPatch({ courier: result.courier });
       setMessage("Mylerz shipment created.");
     } catch (error) {
@@ -720,87 +692,103 @@ function MylerzPanel({
         </div>
       )}
 
-      <div className="mt-4 space-y-3 bg-surface p-4">
-        <div>
-          <label className={shipmentLabelCls}>Warehouse</label>
-          <select
-            value={warehouseName}
-            onChange={(e) => setWarehouseName(e.target.value)}
-            className={shipmentInputCls}
-            disabled={loadingConfig}
-          >
-            <option value="">Choose warehouse...</option>
-            {warehouses.map((warehouse) => (
-              <option key={warehouse.warehouseName} value={warehouse.warehouseName}>
-                {warehouse.warehouseName}
-              </option>
-            ))}
-          </select>
-        </div>
+      {!awb && (order.status === "cancelled" || order.status === "returned") && (
+        <p className="mt-3 border-s-4 border-navy/20 bg-surface p-3 text-xs text-muted">
+          A {order.status} order cannot be shipped.
+        </p>
+      )}
 
-        <div>
-          <label className={shipmentLabelCls}>City zone</label>
-          <div className="flex items-center gap-2">
-            <MapPin size={14} className="shrink-0 text-brand" />
-            <select
-              value={zone}
-              onChange={(e) => setZone(e.target.value)}
-              className={shipmentInputCls}
-              disabled={loadingConfig}
-            >
-              <option value="">Map city/governorate...</option>
-              {zones.map((z) => (
-                <option key={zoneKey(z)} value={zoneKey(z)}>
-                  {zoneLabel(z)}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
+      {!awb &&
+        order.status !== "cancelled" &&
+        order.status !== "returned" && (
+          <div className="mt-4 space-y-3 bg-surface p-4">
+            <p className="text-[10px] leading-tight text-muted">
+              Warehouse and zone are optional — leave them to ship using the
+              order&apos;s own address and the server defaults.
+            </p>
 
-        <div className="grid grid-cols-4 gap-2">
-          {packageFields.map((field) => (
-            <div key={field.label}>
-              <label className={shipmentLabelCls}>{field.label}</label>
-              <input
-                type="number"
-                min={0}
-                step={field.step}
-                value={field.value}
-                onChange={(e) => field.setValue(Number(e.target.value))}
+            <div>
+              <label className={shipmentLabelCls}>Warehouse (optional)</label>
+              <select
+                value={warehouseName}
+                onChange={(e) => setWarehouseName(e.target.value)}
                 className={shipmentInputCls}
+                disabled={loadingConfig}
+              >
+                <option value="">Server default warehouse</option>
+                {warehouses.map((warehouse) => (
+                  <option
+                    key={warehouse.warehouseName}
+                    value={warehouse.warehouseName}
+                  >
+                    {warehouse.warehouseName}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className={shipmentLabelCls}>
+                Override delivery zone (optional)
+              </label>
+              <div className="flex items-center gap-2">
+                <MapPin size={14} className="shrink-0 text-brand" />
+                <select
+                  value={zone}
+                  onChange={(e) => setZone(e.target.value)}
+                  className={shipmentInputCls}
+                  disabled={loadingConfig}
+                >
+                  <option value="">Use order&apos;s address</option>
+                  {zones.map((z) => (
+                    <option key={zoneKey(z)} value={zoneKey(z)}>
+                      {zoneLabel(z)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-4 gap-2">
+              {packageFields.map((field) => (
+                <div key={field.label}>
+                  <label className={shipmentLabelCls}>{field.label}</label>
+                  <input
+                    type="number"
+                    min={0}
+                    step={field.step}
+                    value={field.value}
+                    onChange={(e) => field.setValue(Number(e.target.value))}
+                    className={shipmentInputCls}
+                  />
+                </div>
+              ))}
+            </div>
+
+            <div>
+              <label className={shipmentLabelCls}>Notes</label>
+              <textarea
+                rows={2}
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                className={shipmentInputCls}
+                placeholder="Optional delivery notes"
               />
             </div>
-          ))}
-        </div>
 
-        <div>
-          <label className={shipmentLabelCls}>Notes</label>
-          <textarea
-            rows={2}
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            className={shipmentInputCls}
-            placeholder="Optional delivery notes"
-          />
-        </div>
-
-        <button
-          onClick={createShipment}
-          disabled={
-            busy === "shipment" ||
-            loadingConfig ||
-            order.status === "cancelled" ||
-            !warehouseName ||
-            !selectedZone
-          }
-          className="skew-cta w-full bg-navy py-3 text-xs font-display uppercase tracking-wider text-white hover:bg-navy-deep transition-colors cursor-pointer disabled:opacity-50"
-        >
-          <span>
-            {busy === "shipment" ? "Creating..." : "Create Mylerz Shipment"}
-          </span>
-        </button>
-      </div>
+            <button
+              onClick={createShipment}
+              disabled={busy === "shipment"}
+              className="skew-cta w-full bg-navy py-3 text-xs font-display uppercase tracking-wider text-white hover:bg-navy-deep transition-colors cursor-pointer disabled:opacity-50"
+            >
+              <span>
+                {busy === "shipment"
+                  ? "Creating..."
+                  : "Create Mylerz Shipment"}
+              </span>
+            </button>
+          </div>
+        )}
 
       {awb && (
         <div className="mt-3 grid grid-cols-2 gap-2">
