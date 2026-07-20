@@ -5,6 +5,7 @@ import { X, Minus, Plus, Trash2 } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Link } from "@/i18n/navigation";
 import { useCart } from "./CartProvider";
+import SuggestedProducts from "./SuggestedProducts";
 import { formatEGP, lt } from "@/lib/format";
 import { btn } from "@/components/ui/Button";
 import type { Locale } from "@/lib/types";
@@ -123,6 +124,8 @@ export default function CartDrawer() {
                   </button>
                 </div>
               ))}
+
+              <SuggestedProducts />
             </div>
 
             <div className="border-t border-navy/10 p-5">

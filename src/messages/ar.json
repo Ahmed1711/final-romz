@@ -134,7 +134,8 @@
     "subtotal": "الإجمالي الفرعي",
     "checkout": "إتمام الطلب",
     "remove": "حذف",
-    "shippingNote": "الشحن بيتحسب عند إتمام الطلب"
+    "shippingNote": "الشحن بيتحسب عند إتمام الطلب",
+    "suggestionsTitle": "قد يعجبك أيضاً"
   },
   "checkout": {
     "title": "إتمام الطلب",

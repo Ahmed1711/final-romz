@@ -134,7 +134,8 @@
     "subtotal": "Subtotal",
     "checkout": "Checkout",
     "remove": "Remove",
-    "shippingNote": "Shipping calculated at checkout"
+    "shippingNote": "Shipping calculated at checkout",
+    "suggestionsTitle": "You May Also Like"
   },
   "checkout": {
     "title": "Checkout",
