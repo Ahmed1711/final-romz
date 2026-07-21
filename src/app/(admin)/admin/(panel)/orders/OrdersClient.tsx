@@ -685,7 +685,10 @@ function MylerzPanel({
   const [configError, setConfigError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [actionResult, setActionResult] = useState<string | null>(null);
+  const [actionResult, setActionResult] = useState<{
+    title: string;
+    data: unknown;
+  } | null>(null);
   const [charges, setCharges] = useState<MylerzCharges | null>(null);
 
   const awb = order.courier?.trackingNumber ?? "";
@@ -800,7 +803,7 @@ function MylerzPanel({
         const url = trackingUrlFrom(result);
         if (url) window.open(url, "_blank", "noopener,noreferrer");
       }
-      setActionResult(resultText(result));
+      setActionResult({ title: MYLERZ_ACTION_TITLES[key] ?? "Result", data: result });
       if (key === "cancel") setMessage("Mylerz package cancel request sent.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Mylerz request failed.");
@@ -1070,9 +1073,7 @@ function MylerzPanel({
         <p className="mt-2 text-xs font-bold text-brand">{message}</p>
       )}
       {actionResult && (
-        <pre className="mt-3 max-h-48 overflow-auto bg-navy p-3 text-[11px] leading-relaxed text-white">
-          {actionResult}
-        </pre>
+        <MylerzResult title={actionResult.title} data={actionResult.data} />
       )}
     </section>
   );
@@ -1098,5 +1099,190 @@ function MylerzButton({
       {busy ? <RefreshCw size={13} className="animate-spin" /> : icon}
       {busy ? "Loading..." : label}
     </button>
+  );
+}
+
+// Titles for the styled result card, keyed by the package-action key.
+const MYLERZ_ACTION_TITLES: Record<string, string> = {
+  status: "Package status",
+  details: "Package details",
+  tracking: "Tracking history",
+  "tracking-url": "Tracking link",
+  cancel: "Cancellation result",
+};
+
+// "BarCode" → "Bar code", "StatusDate" → "Status date".
+const humanizeKey = (key: string) =>
+  key
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/[_-]+/g, " ")
+    .replace(/^./, (c) => c.toUpperCase())
+    .trim();
+
+const isDateKey = (key: string, value: unknown): value is string =>
+  typeof value === "string" &&
+  /date|time/i.test(key) &&
+  !Number.isNaN(Date.parse(value));
+
+const formatMylerzDate = (value: string) =>
+  new Date(value).toLocaleString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+const isUrlValue = (value: unknown): value is string =>
+  typeof value === "string" && /^https?:\/\//i.test(value.trim());
+
+// Colour status/phase values so cancelled/failed read red, delivered green.
+const statusTone = (value: string) => {
+  const v = value.toLowerCase();
+  if (/(cancel|fail|reject|return|lost|error)/.test(v))
+    return "text-brand border-brand/30 bg-brand/5";
+  if (/(deliver|success|complete|done|out for)/.test(v))
+    return "text-success border-success/30 bg-success/5";
+  return "text-navy border-navy/15 bg-navy/5";
+};
+
+// Unwrap common backend envelopes so the meaningful payload is rendered.
+const unwrapMylerzResult = (data: unknown): unknown => {
+  if (data && typeof data === "object" && !Array.isArray(data)) {
+    const rec = data as Record<string, unknown>;
+    for (const key of ["data", "result", "package", "shipment", "tracking", "items"]) {
+      if (rec[key] !== undefined) return rec[key];
+    }
+  }
+  return data;
+};
+
+/** Styled, recursive renderer for any Mylerz package response. */
+function MylerzResult({ title, data }: { title: string; data: unknown }) {
+  const value = unwrapMylerzResult(data);
+  return (
+    <div className="mt-3 border-2 border-navy/10 bg-white">
+      <div className="flex items-center gap-2 border-b-2 border-navy/10 bg-surface px-3 py-2">
+        <PackageCheck size={14} className="shrink-0 text-brand" />
+        <p className="text-[11px] font-extrabold uppercase tracking-wider text-navy">
+          {title}
+        </p>
+      </div>
+      <div className="max-h-64 overflow-auto p-3">
+        <MylerzValue value={value} />
+      </div>
+      <details className="border-t border-navy/10 px-3 py-2">
+        <summary className="cursor-pointer text-[10px] font-bold uppercase tracking-wider text-muted hover:text-navy">
+          Raw JSON
+        </summary>
+        <pre className="mt-2 max-h-40 overflow-auto bg-navy p-2 text-[10px] leading-relaxed text-white">
+          {resultText(data)}
+        </pre>
+      </details>
+    </div>
+  );
+}
+
+function MylerzValue({ value, depth = 0 }: { value: unknown; depth?: number }) {
+  if (value === null || value === undefined || value === "") {
+    return <span className="text-muted">—</span>;
+  }
+
+  if (Array.isArray(value)) {
+    if (value.length === 0) return <span className="text-muted">—</span>;
+    return (
+      <div className="space-y-2">
+        {value.map((item, i) => (
+          <div key={i} className="border border-navy/10 bg-surface/60 p-2">
+            <p className="mb-1.5 text-[10px] font-extrabold uppercase tracking-wider text-muted">
+              #{i + 1}
+            </p>
+            <MylerzValue value={item} depth={depth + 1} />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (typeof value === "object") {
+    const entries = Object.entries(value as Record<string, unknown>);
+    if (entries.length === 0) return <span className="text-muted">—</span>;
+    return (
+      <dl className="grid gap-1.5">
+        {entries.map(([key, val]) => (
+          <div
+            key={key}
+            className="grid grid-cols-[minmax(84px,38%)_1fr] items-start gap-2 border-b border-navy/5 pb-1.5 last:border-0 last:pb-0"
+          >
+            <dt className="text-[11px] font-bold uppercase tracking-wide text-muted">
+              {humanizeKey(key)}
+            </dt>
+            <dd className="min-w-0 break-words text-[11px] text-navy">
+              <MylerzField keyName={key} value={val} depth={depth} />
+            </dd>
+          </div>
+        ))}
+      </dl>
+    );
+  }
+
+  return <span className="text-navy">{String(value)}</span>;
+}
+
+function MylerzField({
+  keyName,
+  value,
+  depth,
+}: {
+  keyName: string;
+  value: unknown;
+  depth: number;
+}) {
+  if (value !== null && typeof value === "object") {
+    return (
+      <div className="mt-1">
+        <MylerzValue value={value} depth={depth + 1} />
+      </div>
+    );
+  }
+  if (value === null || value === undefined || value === "") {
+    return <span className="text-muted">—</span>;
+  }
+  if (typeof value === "string" && /status|phase/i.test(keyName)) {
+    return (
+      <span
+        className={clsx(
+          "inline-block border px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide",
+          statusTone(value)
+        )}
+      >
+        {value}
+      </span>
+    );
+  }
+  if (isDateKey(keyName, value)) {
+    return (
+      <span className="font-mono text-navy" dir="ltr">
+        {formatMylerzDate(value)}
+      </span>
+    );
+  }
+  if (isUrlValue(value)) {
+    return (
+      <a
+        href={value}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="break-all font-mono text-brand underline hover:text-brand-dark"
+      >
+        {value}
+      </a>
+    );
+  }
+  const mono = /code|barcode|awb|id|number|phone/i.test(keyName);
+  return (
+    <span className={clsx("text-navy", mono && "font-mono")} dir={mono ? "ltr" : undefined}>
+      {String(value)}
+    </span>
   );
 }
