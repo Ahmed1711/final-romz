@@ -10,17 +10,11 @@ import { useCart } from "@/components/cart/CartProvider";
 import SizeChartModal, { hasSizeChart } from "@/components/product/SizeChartModal";
 import { lt } from "@/lib/format";
 import { orderSizes } from "@/lib/product";
-import type {
-  Locale,
-  Product,
-  ProductColor,
-  StorefrontSizeChart,
-} from "@/lib/types";
+import type { Locale, Product, ProductColor } from "@/lib/types";
 
 export default function ProductPurchase({
   product,
   colors,
-  sizeChart,
   activeColorHex,
   onSelectColor,
   onHoverColor,
@@ -28,8 +22,6 @@ export default function ProductPurchase({
 }: {
   product: Product;
   colors: ProductColor[];
-  /** Store-wide size chart from storefront settings. */
-  sizeChart: StorefrontSizeChart;
   activeColorHex?: string;
   onSelectColor: (hex: string) => void;
   onHoverColor: (hex: string | null) => void;
@@ -44,7 +36,7 @@ export default function ProductPurchase({
   const [qty, setQty] = useState(1);
   const [sizeError, setSizeError] = useState(false);
   const [showSizeChart, setShowSizeChart] = useState(false);
-  const chartAvailable = hasSizeChart(sizeChart);
+  const chartAvailable = hasSizeChart(product.sizeChart);
 
   // Reset the size selection whenever the active color changes (adjusted during
   // render — the endorsed pattern for reacting to a prop change without effects).
@@ -264,7 +256,7 @@ export default function ProductPurchase({
 
       {showSizeChart && (
         <SizeChartModal
-          chart={sizeChart}
+          chart={product.sizeChart}
           onClose={() => setShowSizeChart(false)}
         />
       )}

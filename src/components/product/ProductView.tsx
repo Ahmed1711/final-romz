@@ -9,15 +9,9 @@ import ProductGallery from "@/components/product/ProductGallery";
 import ProductPurchase from "@/components/product/ProductPurchase";
 import { lt } from "@/lib/format";
 import { productColors } from "@/lib/product";
-import type { Locale, Product, StorefrontSizeChart } from "@/lib/types";
+import type { Locale, Product } from "@/lib/types";
 
-export default function ProductView({
-  product,
-  sizeChart,
-}: {
-  product: Product;
-  sizeChart: StorefrontSizeChart;
-}) {
+export default function ProductView({ product }: { product: Product }) {
   const t = useTranslations("product");
   const locale = useLocale() as Locale;
 
@@ -85,7 +79,6 @@ export default function ProductView({
           <ProductPurchase
             product={product}
             colors={colors}
-            sizeChart={sizeChart}
             activeColorHex={activeColorHex}
             onSelectColor={setActiveColorHex}
             onHoverColor={setPreviewHex}

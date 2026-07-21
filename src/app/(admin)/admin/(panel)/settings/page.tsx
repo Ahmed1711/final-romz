@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { getStorefrontSettings } from "@/lib/storefrontSettings";
 import SettingsClient from "./SettingsClient";
-import SizeChartEditor from "./SizeChartEditor";
 
 export default async function AdminSettingsPage() {
   const settings = await getStorefrontSettings();
@@ -48,8 +47,6 @@ export default async function AdminSettingsPage() {
 
           <SettingsClient settings={settings} />
         </div>
-
-        <SizeChartEditor sizeChart={settings.sizeChart} />
       </div>
     </div>
   );

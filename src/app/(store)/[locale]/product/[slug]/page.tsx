@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { getProductBySlug, getProductReviews, getRelatedProducts } from "@/lib/api";
-import { getStorefrontSettings } from "@/lib/storefrontSettings";
 import { Link } from "@/i18n/navigation";
 import { lt } from "@/lib/format";
 import type { Locale } from "@/lib/types";
@@ -22,8 +21,6 @@ export default async function ProductPage({
 
   const product = await getProductBySlug(slug);
   if (!product) notFound();
-
-  const settings = await getStorefrontSettings();
 
   const t = await getTranslations("product");
   const ts = await getTranslations("sections");
@@ -56,7 +53,7 @@ export default async function ProductPage({
         <span className="text-navy">{lt(product.name, locale)}</span>
       </nav>
 
-      <ProductView product={product} sizeChart={settings.sizeChart} />
+      <ProductView product={product} />
 
       {related.length > 0 && (
         <section className="mt-20 md:mt-28">

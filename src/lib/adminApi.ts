@@ -17,7 +17,6 @@ import type {
   ProductImage,
   SizeChart,
   StorefrontSettings,
-  StorefrontSizeChart,
   Variant,
 } from "./types";
 import type {
@@ -27,7 +26,7 @@ import type {
   RevenuePoint,
 } from "./api";
 import { contactListQuery, mapContactMessage, mapProduct } from "./api";
-import { normalizeSizeChart, normalizeStorefrontSettings } from "./storefrontSettings";
+import { normalizeStorefrontSettings } from "./storefrontSettings";
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "").trim().replace(/\/+$/, "");
 const ADMIN_TOKEN_COOKIE = "romz_admin_token";
@@ -541,21 +540,6 @@ export async function updateStorefrontSettings(
     }
   );
   return normalizeStorefrontSettings(data.settings);
-}
-
-/**
- * Patch ONLY the store-wide size chart. The backend shallow-merges sizeChart,
- * so a full save sends columns AND rows together; a quick hide can send just
- * { isActive: false } without losing the table. Other settings are untouched.
- */
-export async function updateSizeChart(
-  sizeChart: StorefrontSizeChart | Partial<StorefrontSizeChart>
-): Promise<StorefrontSizeChart> {
-  const data = await adminFetch<{ settings: { sizeChart?: unknown } }>(
-    "/admin/storefront-settings",
-    { method: "PATCH", json: { sizeChart } }
-  );
-  return normalizeSizeChart(data.settings?.sizeChart);
 }
 
 // ── Analytics (client-side) ─────────────────────────────

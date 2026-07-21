@@ -4,15 +4,12 @@ import { useEffect } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { X } from "lucide-react";
 import { lt } from "@/lib/format";
-import type { Locale, StorefrontSizeChart } from "@/lib/types";
+import type { Locale, SizeChart } from "@/lib/types";
 
-/**
- * True when the chart is active and has at least one column and one row to
- * render. Drives whether the "Size Guide" button shows at all.
- */
-export function hasSizeChart(chart?: StorefrontSizeChart): boolean {
+/** True when the chart has at least one column and one row to render. */
+export function hasSizeChart(chart?: SizeChart): boolean {
   return (
-    !!chart && chart.isActive && chart.columns.length > 0 && chart.rows.length > 0
+    !!chart && chart.columns.length > 0 && chart.rows.length > 0
   );
 }
 
@@ -20,7 +17,7 @@ export default function SizeChartModal({
   chart,
   onClose,
 }: {
-  chart: StorefrontSizeChart;
+  chart: SizeChart;
   onClose: () => void;
 }) {
   const t = useTranslations("product");
@@ -38,17 +35,13 @@ export default function SizeChartModal({
     };
   }, [onClose]);
 
-  const { columns, rows, note, title } = chart;
-  // The store-wide chart carries its own localized title; fall back to the
-  // generic label if the admin left it blank.
-  const heading = lt(title, locale) || t("sizeChart");
+  const { columns, rows, note } = chart;
 
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       role="dialog"
       aria-modal="true"
-      dir={locale === "ar" ? "rtl" : "ltr"}
     >
       <button
         aria-label="Close"
@@ -58,7 +51,7 @@ export default function SizeChartModal({
       <div className="relative z-10 w-full max-w-lg border-2 border-navy bg-white shadow-[10px_10px_0_0_var(--color-navy)]">
         <div className="flex items-center justify-between border-b-2 border-navy px-5 py-4">
           <h2 className="font-display uppercase text-xl text-navy">
-            {heading}
+            {t("sizeChart")}
           </h2>
           <button
             onClick={onClose}

@@ -43,8 +43,6 @@ export interface StorefrontSettings {
   };
   freeShippingThreshold: number | null;
   lowStockThreshold: number;
-  /** Store-wide size chart shown on product pages. */
-  sizeChart: StorefrontSizeChart;
 }
 
 export interface ProductColor {
@@ -72,16 +70,6 @@ export interface SizeChart {
   columns: LocalizedText[];
   rows: string[][];
   note: LocalizedText;
-}
-
-/**
- * Store-wide size chart from storefront settings (data.settings.sizeChart).
- * Same table shape as the per-product SizeChart plus an on/off flag and a
- * localized title. Shown on every product page when active.
- */
-export interface StorefrontSizeChart extends SizeChart {
-  isActive: boolean;
-  title: LocalizedText;
 }
 
 /** Localized fabric composition and care instructions. */
