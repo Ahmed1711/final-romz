@@ -19,6 +19,9 @@ import type {
   Product,
   Review,
   ShippingZone,
+  Governorate,
+  GovernorateZone,
+  ShippingQuote,
 } from "./types";
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "").trim().replace(/\/+$/, "");
@@ -243,7 +246,15 @@ interface BeOrder {
   _id: string;
   orderNumber: string;
   customer?: { name?: string; email?: string; phone?: string };
-  shippingAddress?: { governorate?: string; city?: string; street?: string; apartment?: string };
+  shippingAddress?: {
+    governorate?: string;
+    city?: string;
+    street?: string;
+    apartment?: string;
+    postal?: string;
+    governorateCode?: string;
+    zoneCode?: string;
+  };
   items?: BeOrderItem[];
   subtotal: number;
   shippingFee: number;
@@ -401,6 +412,9 @@ const mapOrder = (o: BeOrder): Order => ({
     city: o.shippingAddress?.city ?? "",
     street: o.shippingAddress?.street ?? "",
     apartment: o.shippingAddress?.apartment || undefined,
+    postal: o.shippingAddress?.postal || undefined,
+    governorateCode: o.shippingAddress?.governorateCode || undefined,
+    zoneCode: o.shippingAddress?.zoneCode || undefined,
   },
   items: (o.items ?? []).map((item) => ({
     productId: String(item.product ?? ""),
@@ -524,6 +538,66 @@ export async function getHomeData(): Promise<HomeData> {
 export async function getShippingZones(): Promise<ShippingZone[]> {
   const { zones } = await apiFetch<{ zones: BeShippingZone[] }>("/shipping-zones");
   return zones.map(mapShippingZone);
+}
+
+interface BeGovernorate {
+  code: string;
+  nameEn: string;
+  nameAr: string;
+  zones?: { code: string; nameEn: string; nameAr: string }[];
+}
+
+/** Governorates + nested zones for the checkout dropdowns (public, cached). */
+export async function getGovernorates(): Promise<Governorate[]> {
+  const { governorates } = await apiFetch<{ governorates: BeGovernorate[] }>(
+    "/shipping/governorates"
+  );
+  return governorates.map((g) => ({
+    code: g.code,
+    nameEn: g.nameEn,
+    nameAr: g.nameAr,
+    zones: (g.zones ?? []).map(
+      (z): GovernorateZone => ({
+        code: z.code,
+        nameEn: z.nameEn,
+        nameAr: z.nameAr,
+      })
+    ),
+  }));
+}
+
+export interface ShippingQuoteInput {
+  zoneCode: string;
+  /** Selected governorate nameEn — lets the backend fall back if Mylerz is down. */
+  governorate?: string;
+  items: { product: string; variantId?: string; sku?: string; qty: number }[];
+  couponCode?: string;
+  paymentMethod?: PaymentMethod;
+}
+
+/** Live shipping fee + cart totals for the selected zone (public). */
+export async function getShippingQuote(
+  input: ShippingQuoteInput,
+  token?: string
+): Promise<ShippingQuote> {
+  const { quote } = await apiFetch<{ quote: ShippingQuote }>("/shipping/quote", {
+    method: "POST",
+    credentials: "include",
+    headers: authHeaders(token),
+    body: JSON.stringify({
+      zoneCode: input.zoneCode,
+      ...(input.governorate ? { governorate: input.governorate } : {}),
+      items: input.items.map((item) => ({
+        product: item.product,
+        ...(item.variantId ? { variantId: item.variantId } : {}),
+        ...(item.sku ? { sku: item.sku } : {}),
+        qty: item.qty,
+      })),
+      couponCode: input.couponCode ?? "",
+      paymentMethod: input.paymentMethod ?? "cod",
+    }),
+  });
+  return quote;
 }
 
 // ── Contact ─────────────────────────────────────────────
@@ -802,7 +876,15 @@ export async function validateCart(
 
 export interface CreateOrderInput {
   customer: { name: string; email: string; phone: string };
-  shippingAddress: { governorate: string; city: string; street: string; apartment?: string };
+  shippingAddress: {
+    governorate: string;
+    city: string;
+    governorateCode: string;
+    zoneCode: string;
+    street: string;
+    apartment?: string;
+    postal?: string;
+  };
   items: { product: string; variantId: string; qty: number }[];
   couponCode?: string;
   paymentMethod: PaymentMethod;

@@ -551,11 +551,17 @@ function MylerzPanel({
   order: Order;
   onOrderPatch: (patch: Partial<Order>) => void;
 }) {
+  // New orders carry the customer's picked Mylerz codes, so the destination is
+  // auto-filled and shipping is one click. Legacy orders start blank.
+  const orderGovCode = order.shippingAddress.governorateCode ?? "";
+  const orderZoneCode = order.shippingAddress.zoneCode ?? "";
+  const autoFilled = Boolean(orderGovCode && orderZoneCode);
+
   const [warehouses, setWarehouses] = useState<MylerzWarehouse[]>([]);
   const [cities, setCities] = useState<MylerzCity[]>([]);
   const [warehouseName, setWarehouseName] = useState("");
-  const [cityCode, setCityCode] = useState("");
-  const [zoneCode, setZoneCode] = useState("");
+  const [cityCode, setCityCode] = useState(orderGovCode);
+  const [zoneCode, setZoneCode] = useState(orderZoneCode);
   const [weight, setWeight] = useState(1);
   const [length, setLength] = useState(20);
   const [width, setWidth] = useState(20);
@@ -735,11 +741,21 @@ function MylerzPanel({
         order.status !== "cancelled" &&
         order.status !== "returned" && (
           <div className="mt-4 space-y-3 bg-surface p-4">
-            <p className="text-[10px] leading-tight text-muted">
-              Pick the Mylerz city and zone that match the customer&apos;s
-              address. These codes are required — Mylerz rejects the free-text
-              address on its own.
-            </p>
+            {autoFilled ? (
+              <p className="border-s-4 border-green-500 bg-green-50 p-2 text-[11px] leading-tight text-green-700">
+                <span className="font-extrabold uppercase">
+                  Destination from order:
+                </span>{" "}
+                {order.shippingAddress.city}, {order.shippingAddress.governorate}{" "}
+                — codes auto-filled. Just press Create.
+              </p>
+            ) : (
+              <p className="text-[10px] leading-tight text-muted">
+                Legacy order without Mylerz codes. Pick the city and zone that
+                match the customer&apos;s address — Mylerz rejects the free-text
+                address on its own.
+              </p>
+            )}
 
             {configError && (
               <p className="border-s-4 border-brand bg-brand/5 p-2 text-[11px] font-bold text-brand">

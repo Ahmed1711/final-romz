@@ -13,12 +13,18 @@ import {
   ApiError,
   createOrder,
   createPaymentIntent,
+  getShippingQuote,
   paymentRedirectUrl,
   validateCart,
   type ValidatedCart,
 } from "@/lib/api";
 import { savePendingOrder } from "@/lib/payment";
-import type { Locale, ShippingZone, StorefrontSettings } from "@/lib/types";
+import type {
+  Governorate,
+  Locale,
+  ShippingQuote,
+  StorefrontSettings,
+} from "@/lib/types";
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "").trim().replace(/\/+$/, "");
 
@@ -28,8 +34,9 @@ interface FormState {
   lastName: string;
   address: string;
   apartment: string;
-  city: string;
-  governorate: string;
+  postal: string;
+  governorateCode: string;
+  zoneCode: string;
   phone: string;
   payment: "paymob" | "cod";
 }
@@ -40,8 +47,9 @@ const initialForm: FormState = {
   lastName: "",
   address: "",
   apartment: "",
-  city: "",
-  governorate: "",
+  postal: "",
+  governorateCode: "",
+  zoneCode: "",
   phone: "",
   payment: "cod",
 };
@@ -105,10 +113,10 @@ const couponRequirementMessage = (error: unknown, locale: Locale) => {
 };
 
 export default function CheckoutClient({
-  zones,
+  governorates,
   settings,
 }: {
-  zones: ShippingZone[];
+  governorates: Governorate[];
   settings: StorefrontSettings;
 }) {
   const t = useTranslations("checkout");
@@ -134,18 +142,20 @@ export default function CheckoutClient({
     orderNumber: string;
     contact: string;
   } | null>(null);
+  // Live Mylerz shipping fee for the selected zone (POST /shipping/quote).
+  const [shippingQuote, setShippingQuote] = useState<ShippingQuote | null>(null);
+  const [quoting, setQuoting] = useState(false);
+  const [quoteError, setQuoteError] = useState<string | null>(null);
 
-  // Only active zones can be shipped to — inactive zones are hidden from checkout.
-  const activeZones = useMemo(() => zones.filter((z) => z.isActive), [zones]);
-  const zone = activeZones.find((z) => z.id === form.governorate);
+  // Two-step governorate → zone selection drives the live shipping quote.
+  const selectedGov = governorates.find((g) => g.code === form.governorateCode);
+  const zoneOptions = selectedGov?.zones ?? [];
+  const selectedZone = zoneOptions.find((z) => z.code === form.zoneCode);
+  const zoneName = (z: { nameEn: string; nameAr: string }) =>
+    locale === "ar" ? z.nameAr || z.nameEn : z.nameEn;
+
   const backendTotal = validatedCart?.total ?? 0;
-  const shippingFee =
-    zone && validatedCart
-      ? settings.freeShippingThreshold !== null &&
-        backendTotal >= settings.freeShippingThreshold
-        ? 0
-        : zone.fee
-      : null;
+  const shippingFee = selectedZone ? shippingQuote?.shippingFee ?? null : null;
   const total = validatedCart ? Math.max(backendTotal + (shippingFee ?? 0), 0) : 0;
 
   const validationItems = useMemo(
@@ -162,7 +172,12 @@ export default function CheckoutClient({
   const set = (key: keyof FormState, value: string) => {
     setLoginRequiredOrder(null);
     setSubmitError(null);
-    setForm((f) => ({ ...f, [key]: value }));
+    setForm((f) => ({
+      ...f,
+      [key]: value,
+      // Changing the governorate invalidates the previously picked zone.
+      ...(key === "governorateCode" ? { zoneCode: "" } : {}),
+    }));
   };
 
   const validateCurrentCart = useCallback(
@@ -222,6 +237,57 @@ export default function CheckoutClient({
     };
   }, [appliedCoupon, t, validateCurrentCart, validationItems.length]);
 
+  // Fetch the live shipping fee whenever the zone, cart, coupon, or payment
+  // method changes. The backend re-computes the authoritative fee on order.
+  const govNameEn = selectedGov?.nameEn;
+  useEffect(() => {
+    if (!form.zoneCode || validationItems.length === 0) {
+      setShippingQuote(null);
+      setQuoteError(null);
+      return;
+    }
+
+    let cancelled = false;
+    setQuoting(true);
+    setQuoteError(null);
+
+    authRequest((token) =>
+      getShippingQuote(
+        {
+          zoneCode: form.zoneCode,
+          governorate: govNameEn,
+          items: validationItems,
+          couponCode: appliedCoupon,
+          paymentMethod: form.payment,
+        },
+        token
+      )
+    )
+      .then((quote) => {
+        if (!cancelled) setShippingQuote(quote);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setShippingQuote(null);
+        setQuoteError(checkoutErrorMessage(error, t("shippingUnavailable")));
+      })
+      .finally(() => {
+        if (!cancelled) setQuoting(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    form.zoneCode,
+    form.payment,
+    govNameEn,
+    appliedCoupon,
+    validationItems,
+    authRequest,
+    t,
+  ]);
+
   const applyCoupon = async () => {
     setCouponError(null);
     const normalized = couponCode.trim().toUpperCase();
@@ -271,8 +337,8 @@ export default function CheckoutClient({
       "firstName",
       "lastName",
       "address",
-      "city",
-      "governorate",
+      "governorateCode",
+      "zoneCode",
       "phone",
     ];
     const newErrors: typeof errors = {};
@@ -284,8 +350,12 @@ export default function CheckoutClient({
       setSubmitError(validationError ?? t("cartValidating"));
       return;
     }
-    if (!zone) {
+    if (!selectedGov || !selectedZone) {
       setSubmitError(t("shippingUnavailable"));
+      return;
+    }
+    if (quoting || quoteError || shippingFee === null) {
+      setSubmitError(quoteError ?? t("cartValidating"));
       return;
     }
     if (form.payment === "paymob" && !paymobActive) {
@@ -314,12 +384,15 @@ export default function CheckoutClient({
           {
             customer,
             shippingAddress: {
-              // The backend matches the governorate by its English name.
-              governorate: zone.governorate.en,
-              city: form.city,
+              // Labels for the dashboard/emails, codes for Mylerz shipping.
+              governorate: selectedGov.nameEn,
+              city: selectedZone.nameEn,
+              governorateCode: selectedGov.code,
+              zoneCode: selectedZone.code,
               street: form.address,
               // Optional on the backend; omit when the customer leaves it blank.
               apartment: form.apartment.trim() || undefined,
+              postal: form.postal.trim() || undefined,
             },
             items: validatedCart.items.map((item) => ({
               product: item.product,
@@ -542,37 +615,58 @@ export default function CheckoutClient({
             </div>
             <div className="grid gap-5 sm:grid-cols-2">
               <div>
-                <input
-                  placeholder={t("city")}
-                  value={form.city}
-                  onChange={(e) => set("city", e.target.value)}
-                  className={clsx(inputCls, errors.city && "border-brand")}
-                />
-                {errors.city && (
+                <select
+                  value={form.governorateCode}
+                  onChange={(e) => set("governorateCode", e.target.value)}
+                  className={clsx(
+                    inputCls,
+                    "bg-transparent",
+                    errors.governorateCode && "border-brand"
+                  )}
+                >
+                  <option value="">{t("governorate")}</option>
+                  {governorates.map((g) => (
+                    <option key={g.code} value={g.code}>
+                      {zoneName(g)}
+                    </option>
+                  ))}
+                </select>
+                {errors.governorateCode && (
                   <p className="mt-1 text-xs text-brand">{t("required")}</p>
                 )}
               </div>
               <div>
                 <select
-                  value={form.governorate}
-                  onChange={(e) => set("governorate", e.target.value)}
+                  value={form.zoneCode}
+                  onChange={(e) => set("zoneCode", e.target.value)}
+                  disabled={!selectedGov}
                   className={clsx(
                     inputCls,
-                    "bg-transparent",
-                    errors.governorate && "border-brand"
+                    "bg-transparent disabled:opacity-60",
+                    errors.zoneCode && "border-brand"
                   )}
                 >
-                  <option value="">{t("governorate")}</option>
-                  {activeZones.map((z) => (
-                    <option key={z.id} value={z.id}>
-                      {lt(z.governorate, locale)}
+                  <option value="">
+                    {selectedGov ? t("zone") : t("zonePickGovernorate")}
+                  </option>
+                  {zoneOptions.map((z) => (
+                    <option key={z.code} value={z.code}>
+                      {zoneName(z)}
                     </option>
                   ))}
                 </select>
-                {errors.governorate && (
+                {errors.zoneCode && (
                   <p className="mt-1 text-xs text-brand">{t("required")}</p>
                 )}
               </div>
+            </div>
+            <div>
+              <input
+                placeholder={t("postal")}
+                value={form.postal}
+                onChange={(e) => set("postal", e.target.value)}
+                className={inputCls}
+              />
             </div>
             <div>
               <div className="flex items-center gap-2 border-b-2 border-navy/30 focus-within:border-brand transition-colors">
@@ -593,15 +687,15 @@ export default function CheckoutClient({
         </Section>
 
         <Section title={t("shippingMethod")}>
-          {activeZones.length === 0 ? (
-            <div className="flex items-center gap-3 border-2 border-navy/10 bg-surface px-4 py-3.5 text-sm text-muted">
-              <Truck size={20} className="shrink-0" />
-              <span>{t("noShippingZones")}</span>
-            </div>
-          ) : !zone ? (
+          {!selectedZone ? (
             <div className="flex items-center gap-3 border-2 border-dashed border-navy/25 bg-white px-4 py-3.5 text-sm text-muted">
               <Truck size={20} className="shrink-0" />
               <span>{t("selectGovernorate")}</span>
+            </div>
+          ) : quoteError ? (
+            <div className="flex items-center gap-3 border-2 border-brand/50 bg-white px-4 py-3.5 text-sm text-brand">
+              <AlertCircle size={20} className="shrink-0" />
+              <span>{quoteError}</span>
             </div>
           ) : (
             <div className="flex items-center justify-between border-2 border-brand bg-white px-4 py-3.5">
@@ -611,10 +705,15 @@ export default function CheckoutClient({
                 </span>
                 <div className="text-start">
                   <p className="text-sm font-bold text-navy">
-                    {lt(zone.governorate, locale)}
+                    {zoneName(selectedZone)}
+                    {selectedGov ? `, ${zoneName(selectedGov)}` : ""}
                   </p>
                   <p className="text-xs text-muted">
-                    {t("shippingDays", { days: zone.estimatedDays })}
+                    {quoting
+                      ? t("cartValidating")
+                      : shippingQuote?.freeShipping
+                        ? t("freeShipping")
+                        : t("shipping")}
                   </p>
                 </div>
               </div>
@@ -624,11 +723,13 @@ export default function CheckoutClient({
                   shippingFee === 0 ? "text-brand" : "text-navy"
                 )}
               >
-                {shippingFee !== null
-                  ? shippingFee === 0
-                    ? t("freeShipping")
-                    : formatEGP(shippingFee, locale)
-                  : "—"}
+                {quoting
+                  ? "…"
+                  : shippingFee !== null
+                    ? shippingFee === 0
+                      ? t("freeShipping")
+                      : formatEGP(shippingFee, locale)
+                    : "—"}
               </span>
             </div>
           )}
@@ -788,11 +889,13 @@ export default function CheckoutClient({
           <div className="flex justify-between text-white/80">
             <span>{t("shipping")}</span>
             <span>
-              {zone && shippingFee !== null
-                ? shippingFee === 0
-                  ? t("freeShipping")
-                  : formatEGP(shippingFee ?? 0, locale)
-                : "—"}
+              {quoting
+                ? "…"
+                : selectedZone && shippingFee !== null
+                  ? shippingFee === 0
+                    ? t("freeShipping")
+                    : formatEGP(shippingFee ?? 0, locale)
+                  : "—"}
             </span>
           </div>
           {(validatedCart?.discount.amount ?? 0) > 0 && (
@@ -817,9 +920,13 @@ export default function CheckoutClient({
             !validatedCart ||
             Boolean(validationError) ||
             !validatedCart.isValid ||
-            Boolean(loginRequiredOrder)
+            Boolean(loginRequiredOrder) ||
+            !selectedZone ||
+            quoting ||
+            Boolean(quoteError) ||
+            shippingFee === null
           }
-          aria-busy={submitting || validatingCart}
+          aria-busy={submitting || validatingCart || quoting}
         >
           {submitting ? "…" : t("payNow")}
         </Button>

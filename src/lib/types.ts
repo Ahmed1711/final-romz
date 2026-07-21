@@ -121,6 +121,32 @@ export interface ShippingZone {
   isActive: boolean;
 }
 
+/** A Mylerz delivery zone (neighborhood) inside a governorate. */
+export interface GovernorateZone {
+  code: string;
+  nameEn: string;
+  nameAr: string;
+}
+
+/** A governorate with its nested zones, from GET /shipping/governorates. */
+export interface Governorate {
+  code: string;
+  nameEn: string;
+  nameAr: string;
+  zones: GovernorateZone[];
+}
+
+/** Live shipping/cart quote from POST /shipping/quote. */
+export interface ShippingQuote {
+  currency: string;
+  subtotal: number;
+  discount: number;
+  cartTotal: number;
+  shippingFee: number;
+  freeShipping: boolean;
+  total: number;
+}
+
 export interface Coupon {
   /** Mongo _id — present when loaded from the backend, absent in mock data. */
   id?: string;
@@ -181,6 +207,11 @@ export interface Order {
     city: string;
     street: string;
     apartment?: string;
+    postal?: string;
+    /** Mylerz governorate code (maps to courier cityCode). New orders only. */
+    governorateCode?: string;
+    /** Mylerz zone code (maps to courier neighborhoodCode). New orders only. */
+    zoneCode?: string;
   };
   items: OrderItem[];
   subtotal: number;

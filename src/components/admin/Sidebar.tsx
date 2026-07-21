@@ -10,7 +10,6 @@ import {
   Shapes,
   ShoppingCart,
   Tag,
-  Truck,
   Users,
   Settings,
 } from "lucide-react";
@@ -23,7 +22,6 @@ const items = [
   { label: "Categories", href: "/admin/categories", icon: Shapes },
   { label: "Orders", href: "/admin/orders", icon: ShoppingCart },
   { label: "Coupons", href: "/admin/coupons", icon: Tag },
-  { label: "Shipping", href: "/admin/shipping", icon: Truck },
   { label: "Customers", href: "/admin/customers", icon: Users },
   { label: "Contact", href: "/admin/contact", icon: Mail },
   { label: "Settings", href: "/admin/settings", icon: Settings },
