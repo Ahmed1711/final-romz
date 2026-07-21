@@ -1,20 +1,34 @@
 "use client";
 
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import SectionHeading from "@/components/ui/SectionHeading";
 import Accordion from "@/components/ui/Accordion";
 import Reveal from "@/components/motion/Reveal";
+import type { Faq, Locale } from "@/lib/types";
 
-export default function FaqSection() {
+export default function FaqSection({ faqs }: { faqs: Faq[] }) {
   const t = useTranslations();
+  const locale = useLocale() as Locale;
 
-  const items = [1, 2, 3, 4, 5].map((i) => ({
-    title: t(`faq.q${i}`),
-    content: t(`faq.a${i}`),
-  }));
+  // Backend-driven: only active FAQs, ordered ascending, localized with an
+  // English fallback.
+  const items = faqs
+    .filter((f) => f.isActive)
+    .sort((a, b) => a.order - b.order)
+    .map((f) => ({
+      title: f.question[locale] || f.question.en,
+      content: f.answer[locale] || f.answer.en,
+    }))
+    .filter((item) => item.title);
+
+  // No active FAQs → hide the whole section.
+  if (items.length === 0) return null;
 
   return (
-    <section className="clip-diagonal-top-flip bg-surface pb-16 pt-24">
+    <section
+      className="clip-diagonal-top-flip bg-surface pb-16 pt-24"
+      dir={locale === "ar" ? "rtl" : "ltr"}
+    >
       <div className="mx-auto max-w-3xl px-4">
         <Reveal direction="start">
           <SectionHeading title={t("sections.faq")} ghost="FAQ" />

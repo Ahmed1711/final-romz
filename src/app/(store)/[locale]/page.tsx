@@ -1,5 +1,6 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { getHomeData } from "@/lib/api";
+import { getStorefrontSettings } from "@/lib/storefrontSettings";
 import { Link } from "@/i18n/navigation";
 import { btn } from "@/components/ui/Button";
 import SectionHeading from "@/components/ui/SectionHeading";
@@ -19,7 +20,8 @@ export default async function HomePage({
   const { locale } = await params;
   setRequestLocale(locale);
   const t = await getTranslations("sections");
-  const { newArrivals, bestSellers, categories, reviews } = await getHomeData();
+  const [{ newArrivals, bestSellers, categories, reviews }, settings] =
+    await Promise.all([getHomeData(), getStorefrontSettings()]);
 
   return (
     <>
@@ -60,7 +62,7 @@ export default async function HomePage({
 
       <ReviewsSection reviews={reviews} />
 
-      <FaqSection />
+      <FaqSection faqs={settings.faqs} />
     </>
   );
 }

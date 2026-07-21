@@ -43,6 +43,27 @@ export interface StorefrontSettings {
   };
   freeShippingThreshold: number | null;
   lowStockThreshold: number;
+  /** Home-page FAQ entries (backend-driven). */
+  faqs: Faq[];
+  /** Shipping & Returns block shown on product pages (backend-driven). */
+  shippingReturns: ShippingReturns;
+}
+
+/** A single FAQ entry from storefront settings (data.settings.faqs). */
+export interface Faq {
+  /** Backend _id, kept so the admin can update items in place. */
+  id?: string;
+  question: LocalizedText;
+  answer: LocalizedText;
+  isActive: boolean;
+  order: number;
+}
+
+/** Shipping & Returns block from storefront settings. */
+export interface ShippingReturns {
+  isActive: boolean;
+  title: LocalizedText;
+  body: LocalizedText;
 }
 
 export interface ProductColor {

@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { getStorefrontSettings } from "@/lib/storefrontSettings";
 import SettingsClient from "./SettingsClient";
+import FaqEditor from "./FaqEditor";
+import ShippingReturnsEditor from "./ShippingReturnsEditor";
 
 export default async function AdminSettingsPage() {
   const settings = await getStorefrontSettings();
@@ -46,6 +48,11 @@ export default async function AdminSettingsPage() {
           </div>
 
           <SettingsClient settings={settings} />
+        </div>
+
+        <div className="space-y-6">
+          <ShippingReturnsEditor shippingReturns={settings.shippingReturns} />
+          <FaqEditor faqs={settings.faqs} />
         </div>
       </div>
     </div>

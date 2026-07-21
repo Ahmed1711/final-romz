@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
+import clsx from "clsx";
 import Rating from "@/components/ui/Rating";
 import Price from "@/components/ui/Price";
 import Accordion from "@/components/ui/Accordion";
@@ -9,9 +10,15 @@ import ProductGallery from "@/components/product/ProductGallery";
 import ProductPurchase from "@/components/product/ProductPurchase";
 import { lt } from "@/lib/format";
 import { productColors } from "@/lib/product";
-import type { Locale, Product } from "@/lib/types";
+import type { Locale, Product, ShippingReturns } from "@/lib/types";
 
-export default function ProductView({ product }: { product: Product }) {
+export default function ProductView({
+  product,
+  shippingReturns,
+}: {
+  product: Product;
+  shippingReturns: ShippingReturns;
+}) {
   const t = useTranslations("product");
   const locale = useLocale() as Locale;
 
@@ -49,6 +56,11 @@ export default function ProductView({ product }: { product: Product }) {
     ) : (
       t("fabricCareBody")
     );
+
+  // Shipping & Returns is backend-driven; localize with an English fallback.
+  const shippingTitle =
+    shippingReturns.title[locale] || shippingReturns.title.en;
+  const shippingBody = shippingReturns.body[locale] || shippingReturns.body.en;
 
   return (
     <div className="grid gap-10 lg:grid-cols-2">
@@ -91,7 +103,26 @@ export default function ProductView({ product }: { product: Product }) {
           items={[
             { title: t("description"), content: lt(product.description, locale) },
             { title: t("fabricCare"), content: fabricCareContent },
-            { title: t("shippingReturns"), content: t("shippingReturnsBody") },
+            // Backend-driven Shipping & Returns — shown only when active and
+            // both a title and body are set. Body preserves line breaks.
+            ...(shippingReturns.isActive && shippingTitle && shippingBody
+              ? [
+                  {
+                    title: shippingTitle,
+                    content: (
+                      <div
+                        dir={locale === "ar" ? "rtl" : "ltr"}
+                        className={clsx(
+                          "whitespace-pre-line",
+                          locale === "ar" && "text-right"
+                        )}
+                      >
+                        {shippingBody}
+                      </div>
+                    ),
+                  },
+                ]
+              : []),
           ]}
         />
       </div>

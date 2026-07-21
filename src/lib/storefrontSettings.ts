@@ -1,4 +1,4 @@
-import type { StorefrontSettings } from "./types";
+import type { Faq, LocalizedText, ShippingReturns, StorefrontSettings } from "./types";
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "").trim().replace(/\/+$/, "");
 
@@ -17,10 +17,50 @@ export const DEFAULT_STOREFRONT_SETTINGS: StorefrontSettings = {
   },
   freeShippingThreshold: null,
   lowStockThreshold: 5,
+  faqs: [],
+  shippingReturns: {
+    isActive: false,
+    title: { en: "", ar: "" },
+    body: { en: "", ar: "" },
+  },
 };
 
 const textValue = (value: unknown, fallback: string) =>
   typeof value === "string" ? value : fallback;
+
+const localizedValue = (value: unknown, fallback: LocalizedText): LocalizedText => {
+  const v = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+  return { en: textValue(v.en, fallback.en), ar: textValue(v.ar, fallback.ar) };
+};
+
+const EMPTY_TEXT: LocalizedText = { en: "", ar: "" };
+
+/** Normalize the FAQ array. Preserves backend _id so the admin can edit in place. */
+export const normalizeFaqs = (value: unknown): Faq[] => {
+  if (!Array.isArray(value)) return [];
+  return value.map((item, index) => {
+    const v = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
+    const id =
+      typeof v._id === "string" ? v._id : typeof v.id === "string" ? v.id : undefined;
+    return {
+      ...(id ? { id } : {}),
+      question: localizedValue(v.question, EMPTY_TEXT),
+      answer: localizedValue(v.answer, EMPTY_TEXT),
+      isActive: typeof v.isActive === "boolean" ? v.isActive : true,
+      order: typeof v.order === "number" ? v.order : index,
+    };
+  });
+};
+
+/** Normalize the Shipping & Returns block. Defaults to hidden when absent. */
+export const normalizeShippingReturns = (value: unknown): ShippingReturns => {
+  const v = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+  return {
+    isActive: typeof v.isActive === "boolean" ? v.isActive : false,
+    title: localizedValue(v.title, EMPTY_TEXT),
+    body: localizedValue(v.body, EMPTY_TEXT),
+  };
+};
 
 export const normalizeStorefrontSettings = (value: unknown): StorefrontSettings => {
   const input = value && typeof value === "object" ? value as Record<string, unknown> : {};
@@ -76,6 +116,8 @@ export const normalizeStorefrontSettings = (value: unknown): StorefrontSettings 
       input.lowStockThreshold >= 0
         ? input.lowStockThreshold
         : DEFAULT_STOREFRONT_SETTINGS.lowStockThreshold,
+    faqs: normalizeFaqs(input.faqs),
+    shippingReturns: normalizeShippingReturns(input.shippingReturns),
   };
 };
 

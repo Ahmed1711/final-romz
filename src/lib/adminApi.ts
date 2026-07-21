@@ -11,10 +11,12 @@ import type {
   ContactMessage,
   ContactStatus,
   FabricCare,
+  Faq,
   Order,
   PageMeta,
   Product,
   ProductImage,
+  ShippingReturns,
   SizeChart,
   StorefrontSettings,
   Variant,
@@ -26,7 +28,11 @@ import type {
   RevenuePoint,
 } from "./api";
 import { contactListQuery, mapContactMessage, mapProduct } from "./api";
-import { normalizeStorefrontSettings } from "./storefrontSettings";
+import {
+  normalizeFaqs,
+  normalizeShippingReturns,
+  normalizeStorefrontSettings,
+} from "./storefrontSettings";
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "").trim().replace(/\/+$/, "");
 const ADMIN_TOKEN_COOKIE = "romz_admin_token";
@@ -540,6 +546,44 @@ export async function updateStorefrontSettings(
     }
   );
   return normalizeStorefrontSettings(data.settings);
+}
+
+/**
+ * Replace the whole FAQ array. The backend swaps `faqs` wholesale, so we send
+ * the full current list. Existing items keep their _id (so the backend updates
+ * in place); new items omit it.
+ */
+export async function updateFaqs(faqs: Faq[]): Promise<Faq[]> {
+  const data = await adminFetch<{ settings: { faqs?: unknown } }>(
+    "/admin/storefront-settings",
+    {
+      method: "PATCH",
+      json: {
+        faqs: faqs.map((f) => ({
+          ...(f.id ? { _id: f.id } : {}),
+          question: f.question,
+          answer: f.answer,
+          isActive: f.isActive,
+          order: f.order,
+        })),
+      },
+    }
+  );
+  return normalizeFaqs(data.settings?.faqs);
+}
+
+/**
+ * Patch the Shipping & Returns block (shallow-merged). A full save sends
+ * { isActive, title, body }; a quick hide can send just { isActive: false }.
+ */
+export async function updateShippingReturns(
+  shippingReturns: ShippingReturns | Partial<ShippingReturns>
+): Promise<ShippingReturns> {
+  const data = await adminFetch<{ settings: { shippingReturns?: unknown } }>(
+    "/admin/storefront-settings",
+    { method: "PATCH", json: { shippingReturns } }
+  );
+  return normalizeShippingReturns(data.settings?.shippingReturns);
 }
 
 // ── Analytics (client-side) ─────────────────────────────
