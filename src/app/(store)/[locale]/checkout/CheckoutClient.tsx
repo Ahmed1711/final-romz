@@ -156,7 +156,14 @@ export default function CheckoutClient({
 
   const backendTotal = validatedCart?.total ?? 0;
   const shippingFee = selectedZone ? shippingQuote?.shippingFee ?? null : null;
-  const total = validatedCart ? Math.max(backendTotal + (shippingFee ?? 0), 0) : 0;
+  // Total is authoritative from the backend: the quote's `total` already
+  // includes cart + shipping + VAT. Before a zone is picked (no quote yet),
+  // fall back to the cart-only total from cart validation.
+  const total = shippingQuote
+    ? shippingQuote.total
+    : validatedCart
+      ? backendTotal
+      : 0;
 
   const validationItems = useMemo(
     () =>
