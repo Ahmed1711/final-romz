@@ -34,7 +34,9 @@ export default function ProductGallery({
   const current = images[active] ?? images[0];
 
   return (
-    <div className="flex gap-3">
+    // self-start: don't stretch to the taller info column in the product grid,
+    // so the image box hugs the image height instead of leaving empty space.
+    <div className="flex gap-3 self-start">
       {images.length > 1 && (
         <div className="flex flex-col gap-2">
           {images.map((img, i) => (
