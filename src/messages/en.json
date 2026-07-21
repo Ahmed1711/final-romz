@@ -129,7 +129,7 @@
     "reviewNameLabel": "Your name",
     "reviewCommentLabel": "Your review (optional)",
     "reviewSubmit": "Submit Review",
-    "reviewThanks": "Thanks! Your review has been submitted.",
+    "reviewThanks": "Thanks! Your review was submitted and will appear once it's approved.",
     "reviewPickRating": "Please pick a star rating.",
     "reviewNameRequired": "Please enter your name.",
     "reviewFailed": "Could not submit your review. Please try again.",

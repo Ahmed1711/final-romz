@@ -5,6 +5,7 @@
 
 import type {
   Badge,
+  AdminReview,
   Category,
   ContactMessage,
   ContactStatus,
@@ -216,12 +217,14 @@ interface BeProduct {
 
 interface BeReview {
   _id: string;
-  product?: string | { _id: string };
+  product?: string | { _id: string; name?: LocalizedText };
   user?: { name?: string } | null;
   guestName?: string;
   rating: number;
   comment?: string;
   isVerifiedPurchase?: boolean;
+  isApproved?: boolean;
+  createdAt?: string;
 }
 
 interface BeShippingZone {
@@ -1100,6 +1103,31 @@ export async function getReviews(token?: string): Promise<Review[]> {
     headers: authHeaders(token),
   });
   return reviews.map(mapReview);
+}
+
+const mapAdminReview = (r: BeReview): AdminReview => {
+  const product =
+    typeof r.product === "object" && r.product !== null ? r.product : null;
+  return {
+    id: r._id,
+    productId: product ? product._id : String(r.product ?? ""),
+    productName: product?.name?.en || product?.name?.ar || "",
+    name: r.guestName || r.user?.name || "ROMZ Customer",
+    rating: r.rating,
+    comment: r.comment ?? "",
+    isApproved: r.isApproved ?? false,
+    isVerifiedPurchase: r.isVerifiedPurchase ?? false,
+    createdAt: r.createdAt ?? "",
+  };
+};
+
+/** All reviews (approved + pending) for the admin moderation screen. */
+export async function getAdminReviews(token?: string): Promise<AdminReview[]> {
+  const { reviews } = await apiFetch<{ reviews: BeReview[] }>(
+    "/reviews/admin?limit=100",
+    { headers: authHeaders(token) }
+  );
+  return reviews.map(mapAdminReview);
 }
 
 export interface AnalyticsMetric {

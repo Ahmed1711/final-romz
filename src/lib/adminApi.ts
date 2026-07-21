@@ -524,6 +524,18 @@ export async function deleteShippingZone(id: string): Promise<void> {
   await adminFetch(`/shipping-zones/${encodeURIComponent(id)}`, { method: "DELETE" });
 }
 
+// ── Reviews (moderation) ────────────────────────────────
+// Customer reviews arrive pending (isApproved: false) and only show on the
+// storefront once approved. GET list is api.ts getAdminReviews.
+
+export async function approveReview(id: string): Promise<void> {
+  await adminFetch(`/reviews/${encodeURIComponent(id)}/approve`, { method: "PATCH" });
+}
+
+export async function deleteReview(id: string): Promise<void> {
+  await adminFetch(`/reviews/${encodeURIComponent(id)}`, { method: "DELETE" });
+}
+
 // Storefront settings are persisted by the backend. This replaces the old
 // frontend-local JSON settings file so checkout and admin share one source.
 export async function updateStorefrontSettings(

@@ -133,6 +133,20 @@ export interface Review {
   isVerifiedPurchase: boolean;
 }
 
+/** A review as seen by the admin moderation screen (includes approval state). */
+export interface AdminReview {
+  id: string;
+  productId: string;
+  /** Product display name if the backend populated it, else "". */
+  productName: string;
+  name: string;
+  rating: number;
+  comment: string;
+  isApproved: boolean;
+  isVerifiedPurchase: boolean;
+  createdAt: string;
+}
+
 export interface ShippingZone {
   id: string;
   governorate: LocalizedText;

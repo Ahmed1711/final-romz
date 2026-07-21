@@ -129,7 +129,7 @@
     "reviewNameLabel": "اسمك",
     "reviewCommentLabel": "تعليقك (اختياري)",
     "reviewSubmit": "إرسال التقييم",
-    "reviewThanks": "شكراً! تم إرسال تقييمك.",
+    "reviewThanks": "شكراً! تم إرسال تقييمك وسيظهر بعد الموافقة عليه.",
     "reviewPickRating": "من فضلك اختر تقييماً بالنجوم.",
     "reviewNameRequired": "من فضلك أدخل اسمك.",
     "reviewFailed": "تعذر إرسال تقييمك. حاول مرة أخرى.",
