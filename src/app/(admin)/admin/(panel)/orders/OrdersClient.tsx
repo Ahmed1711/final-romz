@@ -96,9 +96,11 @@ export default function OrdersClient({ orders }: { orders: Order[] }) {
       // Keep Mylerz in sync with the order status:
       //   confirmed → create the shipment (once), cancelled → cancel the package.
       // A failure here never rolls back the status; it's surfaced as a note.
-      if (status === "confirmed" && !order.courier?.trackingNumber) {
+      const shipmentId =
+        order.courier?.trackingNumber || order.courier?.pickupOrderCode;
+      if (status === "confirmed" && !shipmentId) {
         await autoCreateShipment(order);
-      } else if (status === "cancelled" && order.courier?.trackingNumber) {
+      } else if (status === "cancelled" && shipmentId) {
         await autoCancelShipment(order);
       }
 
@@ -146,12 +148,15 @@ export default function OrdersClient({ orders }: { orders: Order[] }) {
     }
   };
 
-  // Cancel the Mylerz package when an order with an existing shipment is cancelled.
+  // Cancel the Mylerz package when an order with an existing shipment is
+  // cancelled. Mylerz's create call may return only a pickup order code (no AWB
+  // yet), so cancel by whichever identifier the shipment has.
   const autoCancelShipment = async (order: Order) => {
-    const awb = order.courier?.trackingNumber;
-    if (!awb) return;
+    const shipmentId =
+      order.courier?.trackingNumber || order.courier?.pickupOrderCode;
+    if (!shipmentId) return;
     try {
-      await cancelMylerzPackage(awb);
+      await cancelMylerzPackage(shipmentId);
       setShipmentNote({
         kind: "ok",
         text: "Order cancelled and the Mylerz package cancel request was sent.",
