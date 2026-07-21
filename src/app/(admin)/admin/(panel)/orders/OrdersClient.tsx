@@ -445,6 +445,12 @@ export default function OrdersClient({ orders }: { orders: Order[] }) {
                       : `${selected.shippingFee.toLocaleString()} EGP`}
                   </span>
                 </div>
+                {(selected.shippingVat ?? 0) > 0 && (
+                  <div className="flex justify-between text-muted">
+                    <span>Shipping VAT</span>
+                    <span>{selected.shippingVat!.toLocaleString()} EGP</span>
+                  </div>
+                )}
                 <div className="flex justify-between pt-2 text-base font-extrabold">
                   <span className="text-navy">Total</span>
                   <span className="text-brand">

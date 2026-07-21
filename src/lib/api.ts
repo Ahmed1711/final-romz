@@ -258,6 +258,7 @@ interface BeOrder {
   items?: BeOrderItem[];
   subtotal: number;
   shippingFee: number;
+  shippingVat?: number;
   discount?: { couponCode?: string; amount?: number };
   total: number;
   paymentMethod: string;
@@ -428,6 +429,7 @@ const mapOrder = (o: BeOrder): Order => ({
   })),
   subtotal: o.subtotal,
   shippingFee: o.shippingFee,
+  shippingVat: o.shippingVat,
   discount: o.discount?.amount
     ? { couponCode: o.discount.couponCode ?? "", amount: o.discount.amount }
     : undefined,

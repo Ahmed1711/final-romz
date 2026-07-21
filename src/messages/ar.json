@@ -153,6 +153,7 @@
     "zone": "المنطقة",
     "zonePickGovernorate": "اختر المحافظة أولاً",
     "postal": "الرقم البريدي (اختياري)",
+    "vat": "ضريبة الشحن",
     "phone": "رقم الموبايل",
     "shippingMethod": "طريقة الشحن",
     "shippingDays": "الشحن ({days} أيام عمل)",

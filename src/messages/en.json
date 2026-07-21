@@ -153,6 +153,7 @@
     "zone": "Area / Zone",
     "zonePickGovernorate": "Select governorate first",
     "postal": "Postal code (optional)",
+    "vat": "Shipping VAT",
     "phone": "Phone",
     "shippingMethod": "Shipping Method",
     "shippingDays": "Shipping ({days} Working Days)",

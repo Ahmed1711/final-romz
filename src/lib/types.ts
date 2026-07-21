@@ -143,6 +143,8 @@ export interface ShippingQuote {
   discount: number;
   cartTotal: number;
   shippingFee: number;
+  /** VAT charged on the shipping fee. total already includes it. */
+  shippingVat?: number;
   freeShipping: boolean;
   total: number;
 }
@@ -216,6 +218,8 @@ export interface Order {
   items: OrderItem[];
   subtotal: number;
   shippingFee: number;
+  /** VAT charged on the shipping fee. total already includes it. */
+  shippingVat?: number;
   discount?: { couponCode: string; amount: number };
   total: number;
   paymentMethod: PaymentMethod;

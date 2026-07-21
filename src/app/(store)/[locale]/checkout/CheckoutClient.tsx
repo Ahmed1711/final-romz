@@ -911,6 +911,12 @@ export default function CheckoutClient({
               <span>-{formatEGP(validatedCart?.discount.amount ?? 0, locale)}</span>
             </div>
           )}
+          {(shippingQuote?.shippingVat ?? 0) > 0 && (
+            <div className="flex justify-between text-white/80">
+              <span>{t("vat")}</span>
+              <span>{formatEGP(shippingQuote?.shippingVat ?? 0, locale)}</span>
+            </div>
+          )}
           <div className="flex justify-between pt-2 text-lg font-extrabold">
             <span>{t("total")}</span>
             <span>{validatedCart ? formatEGP(total, locale) : "..."}</span>
