@@ -69,6 +69,11 @@ export default function OrdersClient({ orders }: { orders: Order[] }) {
   const [nextStatus, setNextStatus] = useState<OrderStatus | "">("");
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  // Result of the Mylerz side-effect that runs on confirm/cancel.
+  const [shipmentNote, setShipmentNote] = useState<{
+    kind: "ok" | "error";
+    text: string;
+  } | null>(null);
 
   const list = useMemo(
     () =>
@@ -81,11 +86,22 @@ export default function OrdersClient({ orders }: { orders: Order[] }) {
   const applyStatus = async (order: Order, status: OrderStatus) => {
     setBusy(true);
     setActionError(null);
+    setShipmentNote(null);
     try {
       await updateOrderStatus(order.id, status);
       setStatusOverrides((m) => ({ ...m, [order.id]: status }));
       setSelected((s) => (s && s.id === order.id ? { ...s, status } : s));
       setNextStatus("");
+
+      // Keep Mylerz in sync with the order status:
+      //   confirmed → create the shipment (once), cancelled → cancel the package.
+      // A failure here never rolls back the status; it's surfaced as a note.
+      if (status === "confirmed" && !order.courier?.trackingNumber) {
+        await autoCreateShipment(order);
+      } else if (status === "cancelled" && order.courier?.trackingNumber) {
+        await autoCancelShipment(order);
+      }
+
       router.refresh();
     } catch (error) {
       setActionError(
@@ -93,6 +109,60 @@ export default function OrdersClient({ orders }: { orders: Order[] }) {
       );
     } finally {
       setBusy(false);
+    }
+  };
+
+  // Create the Mylerz shipment when an order is confirmed. Mirrors the manual
+  // panel's guards (valid Egyptian mobile + real zone codes); legacy orders
+  // without codes are left for the admin to ship manually.
+  const autoCreateShipment = async (order: Order) => {
+    if (!isValidEgyptMobile(order.customer.phone)) {
+      setShipmentNote({
+        kind: "error",
+        text: "Confirmed, but no Mylerz shipment was created: the recipient phone isn't a valid Egyptian mobile. Fix it, then create the shipment in the Mylerz panel.",
+      });
+      return;
+    }
+    if (!order.shippingAddress.governorateCode || !order.shippingAddress.zoneCode) {
+      setShipmentNote({
+        kind: "error",
+        text: "Confirmed, but no Mylerz shipment was created: this order has no Mylerz zone codes (placed before checkout collected them). Create it manually in the Mylerz panel.",
+      });
+      return;
+    }
+    try {
+      const result = await createShipmentForOrder(order);
+      setSelected((s) =>
+        s && s.id === order.id ? { ...s, courier: result.courier } : s
+      );
+      setShipmentNote({ kind: "ok", text: "Confirmed and Mylerz shipment created." });
+    } catch (error) {
+      setShipmentNote({
+        kind: "error",
+        text: `Confirmed, but the Mylerz shipment failed: ${
+          error instanceof Error ? error.message : "unknown error"
+        }`,
+      });
+    }
+  };
+
+  // Cancel the Mylerz package when an order with an existing shipment is cancelled.
+  const autoCancelShipment = async (order: Order) => {
+    const awb = order.courier?.trackingNumber;
+    if (!awb) return;
+    try {
+      await cancelMylerzPackage(awb);
+      setShipmentNote({
+        kind: "ok",
+        text: "Order cancelled and the Mylerz package cancel request was sent.",
+      });
+    } catch (error) {
+      setShipmentNote({
+        kind: "error",
+        text: `Order cancelled, but the Mylerz cancel failed: ${
+          error instanceof Error ? error.message : "unknown error"
+        }. Cancel it in the Mylerz panel.`,
+      });
     }
   };
 
@@ -511,6 +581,16 @@ export default function OrdersClient({ orders }: { orders: Order[] }) {
               {actionError && (
                 <p className="text-xs font-bold text-brand">{actionError}</p>
               )}
+              {shipmentNote && (
+                <p
+                  className={clsx(
+                    "text-xs font-bold leading-tight",
+                    shipmentNote.kind === "ok" ? "text-success" : "text-brand"
+                  )}
+                >
+                  {shipmentNote.text}
+                </p>
+              )}
             </div>
           </aside>
         </>
@@ -531,6 +611,29 @@ const optionLabel = (enName: string, arName: string) =>
 // valid Egyptian number: 11 digits starting 01, optionally with a +20/20 prefix.
 const isValidEgyptMobile = (raw: string) =>
   /^(?:\+?20|0)1[0125]\d{8}$/.test(raw.replace(/[\s()-]/g, ""));
+
+// Default parcel used when a shipment is created automatically on confirm.
+// Matches the manual Mylerz panel's defaults; the admin can still adjust and
+// recreate from the panel if needed.
+const AUTO_SHIPMENT_PACKAGE = { weight: 1, length: 20, width: 20, height: 10 };
+
+// Build and send the Mylerz shipment from the order itself: the account's
+// default warehouse plus the customer's stored city/zone codes.
+async function createShipmentForOrder(order: Order) {
+  const warehouses = await getMylerzWarehouses();
+  const overrides: MylerzShipmentPayload = {
+    warehouseName: warehouses[0]?.name || undefined,
+    cityCode: order.shippingAddress.governorateCode || undefined,
+    neighborhoodCode: order.shippingAddress.zoneCode || undefined,
+    totalWeight: AUTO_SHIPMENT_PACKAGE.weight,
+    dimensions: {
+      length: AUTO_SHIPMENT_PACKAGE.length,
+      width: AUTO_SHIPMENT_PACKAGE.width,
+      height: AUTO_SHIPMENT_PACKAGE.height,
+    },
+  };
+  return createMylerzShipment(order.id, overrides);
+}
 
 const resultText = (value: unknown) =>
   typeof value === "string"
