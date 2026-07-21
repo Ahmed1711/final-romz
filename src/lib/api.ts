@@ -515,6 +515,36 @@ export async function getProductReviews(productId: string): Promise<Review[]> {
   return reviews.map(mapReview);
 }
 
+export interface CreateReviewInput {
+  /** 1–5 stars. */
+  rating: number;
+  /** Reviewer display name (sent as guestName). */
+  name: string;
+  comment?: string;
+}
+
+/**
+ * Submit a product review/rating. Public — a logged-in customer token is
+ * forwarded when available so the review is attributed to their account,
+ * otherwise the guest name is used. POST /reviews/product/:productId.
+ */
+export async function createReview(
+  productId: string,
+  input: CreateReviewInput,
+  token?: string
+): Promise<void> {
+  await apiFetch(`/reviews/product/${encodeURIComponent(productId)}`, {
+    method: "POST",
+    credentials: "include",
+    headers: authHeaders(token),
+    body: JSON.stringify({
+      rating: input.rating,
+      guestName: input.name,
+      ...(input.comment ? { comment: input.comment } : {}),
+    }),
+  });
+}
+
 export interface HomeData {
   newArrivals: Product[];
   bestSellers: Product[];

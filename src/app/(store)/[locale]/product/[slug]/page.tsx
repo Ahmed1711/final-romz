@@ -9,6 +9,7 @@ import Rating from "@/components/ui/Rating";
 import SectionHeading from "@/components/ui/SectionHeading";
 import ProductGrid from "@/components/product/ProductGrid";
 import ProductView from "@/components/product/ProductView";
+import ReviewForm from "@/components/product/ReviewForm";
 import { BadgeCheck } from "lucide-react";
 
 export default async function ProductPage({
@@ -65,12 +66,12 @@ export default async function ProductPage({
         </section>
       )}
 
-      {reviewCount > 0 && (
-        <section className="mt-20 border-t-2 border-navy pt-12 md:mt-28">
-          <h2 className="font-display uppercase text-3xl md:text-5xl text-navy">
-            {t("customerReviews")}
-          </h2>
+      <section className="mt-20 border-t-2 border-navy pt-12 md:mt-28">
+        <h2 className="font-display uppercase text-3xl md:text-5xl text-navy">
+          {t("customerReviews")}
+        </h2>
 
+        {reviewCount > 0 ? (
           <div className="mt-8 grid gap-10 lg:grid-cols-[280px_1fr]">
             {/* Summary */}
             <div>
@@ -104,10 +105,6 @@ export default async function ProductPage({
                   );
                 })}
               </div>
-
-              <button className="mt-6 w-full border-2 border-brand px-6 py-3 text-center font-display uppercase tracking-wider text-brand transition-colors hover:bg-brand hover:text-white cursor-pointer">
-                {t("writeReview")}
-              </button>
             </div>
 
             {/* Review list */}
@@ -136,8 +133,14 @@ export default async function ProductPage({
               ))}
             </div>
           </div>
-        </section>
-      )}
+        ) : (
+          <p className="mt-6 text-sm text-muted">{t("noReviewsYet")}</p>
+        )}
+
+        <div className="mt-10 max-w-2xl">
+          <ReviewForm productId={product.id} />
+        </div>
+      </section>
     </div>
   );
 }
