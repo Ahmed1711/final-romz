@@ -14,6 +14,7 @@ import type {
   FabricCare,
   Faq,
   Order,
+  OrderStatus,
   PageMeta,
   Product,
   ProductImage,
@@ -865,6 +866,63 @@ export async function createMylerzShipment(
     { method: "POST", json: body }
   );
   return { courier: courierFromResponse(data) };
+}
+
+// Result of syncing an order's status from the live Mylerz delivery status.
+// The server owns the mapping/advancement rules; we just apply what it returns.
+export interface OrderStatusSync {
+  /** true when order.status actually changed. */
+  changed: boolean;
+  /** Mapped order status (shipped|delivered|returned|cancelled) or null. */
+  mappedStatus: OrderStatus | null;
+  /** Live Mylerz text to show as the courier status line. */
+  courierStatus: string;
+  /** order.status after the sync (undefined if the server omitted it). */
+  status?: OrderStatus;
+  /** order.courier.status text. */
+  courierStatusText?: string;
+  trackingNumber?: string;
+  /** mylerz.StatusDate — "last update" timestamp. */
+  statusDate?: string;
+}
+
+/**
+ * Sync an order's status from the live Mylerz delivery status. Returns null
+ * when there's nothing to sync (400 — order has no tracking number), so
+ * callers can treat it as a no-op.
+ */
+export async function syncOrderStatus(
+  orderId: string
+): Promise<OrderStatusSync | null> {
+  try {
+    const data = await adminFetch<{
+      changed?: boolean;
+      mappedStatus?: string | null;
+      courierStatus?: string;
+      order?: {
+        status?: string;
+        courier?: { status?: string; trackingNumber?: string };
+      };
+      mylerz?: { StatusDate?: string };
+    }>(`/couriers/mylerz/orders/${encodeURIComponent(orderId)}/sync-status`, {
+      method: "POST",
+    });
+    return {
+      changed: Boolean(data.changed),
+      mappedStatus: (data.mappedStatus as OrderStatus | null) ?? null,
+      courierStatus: data.courierStatus ?? data.order?.courier?.status ?? "",
+      status: (data.order?.status as OrderStatus | undefined) ?? undefined,
+      courierStatusText: data.order?.courier?.status,
+      trackingNumber: data.order?.courier?.trackingNumber,
+      statusDate: data.mylerz?.StatusDate,
+    };
+  } catch (error) {
+    // 400 = order has no Mylerz tracking → nothing to sync (no-op).
+    if (error instanceof Error && /tracking|\b400\b/i.test(error.message)) {
+      return null;
+    }
+    throw error;
+  }
 }
 
 export async function getMylerzPackageStatus(awb: string): Promise<unknown> {

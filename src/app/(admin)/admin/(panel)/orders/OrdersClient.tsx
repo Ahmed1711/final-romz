@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { useRouter } from "next/navigation";
 import {
   CalendarRange,
@@ -29,11 +36,13 @@ import {
   getMylerzPackageTracking,
   getMylerzPackageTrackingUrl,
   getMylerzWarehouses,
+  syncOrderStatus,
   updateOrderStatus,
   type MylerzCharges,
   type MylerzCity,
   type MylerzShipmentPayload,
   type MylerzWarehouse,
+  type OrderStatusSync,
 } from "@/lib/adminApi";
 import type { Order, OrderStatus } from "@/lib/types";
 
@@ -55,6 +64,36 @@ const FULFILLMENT_STEPS: { key: OrderStatus; label: string; note?: string }[] = 
   { key: "delivered", label: "Delivered" },
 ];
 
+// Terminal statuses never re-sync from Mylerz (the server also won't downgrade).
+const TERMINAL_STATUSES: OrderStatus[] = ["delivered", "returned", "cancelled"];
+// Don't re-sync the same order more than once per this window.
+const SYNC_DEBOUNCE_MS = 30_000;
+// Background list sync concurrency.
+const SYNC_CONCURRENCY = 4;
+
+/** An order can be synced only if it has a Mylerz AWB and isn't terminal yet. */
+const isSyncable = (o: Order) =>
+  Boolean(o.courier?.trackingNumber) && !TERMINAL_STATUSES.includes(o.status);
+
+/** Run `worker` over `items` with a bounded number of concurrent runners. */
+async function runPool<T>(
+  items: T[],
+  limit: number,
+  worker: (item: T) => Promise<void>
+): Promise<void> {
+  let cursor = 0;
+  const runners = Array.from(
+    { length: Math.min(limit, items.length) },
+    async () => {
+      while (cursor < items.length) {
+        const item = items[cursor++];
+        await worker(item);
+      }
+    }
+  );
+  await Promise.all(runners);
+}
+
 export default function OrdersClient({ orders }: { orders: Order[] }) {
   const router = useRouter();
   const [tab, setTab] = useState<(typeof TABS)[number]>("all");
@@ -74,6 +113,17 @@ export default function OrdersClient({ orders }: { orders: Order[] }) {
     kind: "ok" | "error";
     text: string;
   } | null>(null);
+  // Live Mylerz status sync.
+  const lastSyncRef = useRef<Map<string, number>>(new Map());
+  const [detailSyncing, setDetailSyncing] = useState(false);
+  const [syncAllBusy, setSyncAllBusy] = useState(false);
+  const [detailSync, setDetailSync] = useState<{
+    courierStatus: string;
+    statusDate?: string;
+  } | null>(null);
+  const [toast, setToast] = useState<{ kind: "ok" | "error"; text: string } | null>(
+    null
+  );
 
   const list = useMemo(
     () =>
@@ -82,6 +132,141 @@ export default function OrdersClient({ orders }: { orders: Order[] }) {
       ),
     [orders, statusOverrides]
   );
+
+  // Apply a Mylerz sync result: update the row badge and the open order detail.
+  const applySync = useCallback((orderId: string, r: OrderStatusSync) => {
+    if (r.status) {
+      setStatusOverrides((m) => ({ ...m, [orderId]: r.status as OrderStatus }));
+    }
+    setSelected((s) =>
+      s && s.id === orderId
+        ? {
+            ...s,
+            ...(r.status ? { status: r.status } : {}),
+            courier: {
+              ...s.courier,
+              status:
+                r.courierStatusText || r.courierStatus || s.courier?.status,
+              trackingNumber: r.trackingNumber ?? s.courier?.trackingNumber,
+            },
+          }
+        : s
+    );
+  }, []);
+
+  // Sync one order (guarded + debounced). Returns the result, or null on no-op.
+  const syncOne = useCallback(
+    async (order: Order, force = false): Promise<OrderStatusSync | null> => {
+      if (!isSyncable(order)) return null;
+      const last = lastSyncRef.current.get(order.id);
+      if (!force && last && Date.now() - last < SYNC_DEBOUNCE_MS) return null;
+      lastSyncRef.current.set(order.id, Date.now());
+      const result = await syncOrderStatus(order.id);
+      if (result) applySync(order.id, result);
+      return result;
+    },
+    [applySync]
+  );
+
+  // Auto-dismiss the toast.
+  useEffect(() => {
+    if (!toast) return;
+    const id = setTimeout(() => setToast(null), 3500);
+    return () => clearTimeout(id);
+  }, [toast]);
+
+  // Detail auto-sync: when a syncable order is opened, refresh its live status.
+  const selectedId = selected?.id;
+  useEffect(() => {
+    if (!selected || !isSyncable(selected)) return;
+    let cancelled = false;
+    setDetailSync(null);
+    syncOne(selected)
+      .then((r) => {
+        if (!cancelled && r) {
+          setDetailSync({ courierStatus: r.courierStatus, statusDate: r.statusDate });
+        }
+      })
+      .catch((e) => console.warn("Auto-sync failed:", e));
+    return () => {
+      cancelled = true;
+    };
+    // Only re-run when a different order is opened.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId]);
+
+  // List background sync: on load, refresh every syncable order (throttled).
+  useEffect(() => {
+    const syncable = list.filter(isSyncable);
+    if (syncable.length === 0) return;
+    let cancelled = false;
+    void runPool(syncable, SYNC_CONCURRENCY, async (o) => {
+      if (cancelled) return;
+      try {
+        await syncOne(o);
+      } catch (e) {
+        console.warn("Background sync failed:", o.orderNumber, e);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+    // Re-run when the server data changes; debounce guards against spam.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orders]);
+
+  // Manual "Refresh status" on the detail panel (toast + spinner).
+  const refreshDetailStatus = async () => {
+    if (!selected) return;
+    setDetailSyncing(true);
+    try {
+      const r = await syncOne(selected, true);
+      if (!r) {
+        setToast({ kind: "ok", text: "No tracking to sync yet." });
+      } else {
+        setDetailSync({ courierStatus: r.courierStatus, statusDate: r.statusDate });
+        setToast({
+          kind: "ok",
+          text: r.changed
+            ? `Status updated: ${r.status ?? r.courierStatus}`
+            : "No change",
+        });
+      }
+      router.refresh();
+    } catch (e) {
+      setToast({
+        kind: "error",
+        text: e instanceof Error ? e.message : "Couldn't sync status.",
+      });
+    } finally {
+      setDetailSyncing(false);
+    }
+  };
+
+  // Top "Sync shipped" button: force-sync every syncable order in the list.
+  const syncAllShipped = async () => {
+    const syncable = list.filter(isSyncable);
+    if (syncable.length === 0) {
+      setToast({ kind: "ok", text: "No shipped orders to sync." });
+      return;
+    }
+    setSyncAllBusy(true);
+    let changed = 0;
+    await runPool(syncable, SYNC_CONCURRENCY, async (o) => {
+      try {
+        const r = await syncOne(o, true);
+        if (r?.changed) changed += 1;
+      } catch (e) {
+        console.warn("Sync-all failed:", o.orderNumber, e);
+      }
+    });
+    setSyncAllBusy(false);
+    setToast({
+      kind: "ok",
+      text: changed > 0 ? `${changed} order(s) updated.` : "All up to date.",
+    });
+    router.refresh();
+  };
 
   const applyStatus = async (order: Order, status: OrderStatus) => {
     setBusy(true);
@@ -251,6 +436,17 @@ export default function OrdersClient({ orders }: { orders: Order[] }) {
             className="w-full bg-transparent text-sm outline-none placeholder:text-muted"
           />
         </div>
+        <button
+          onClick={syncAllShipped}
+          disabled={syncAllBusy}
+          className="flex items-center gap-2 border-2 border-navy/15 bg-white px-3 py-2.5 text-xs font-extrabold uppercase text-navy transition-colors hover:border-brand hover:text-brand cursor-pointer disabled:opacity-50"
+        >
+          <RefreshCw
+            size={14}
+            className={clsx("text-brand", syncAllBusy && "animate-spin")}
+          />
+          {syncAllBusy ? "Syncing…" : "Sync shipped"}
+        </button>
       </div>
 
       {/* Table */}
@@ -372,6 +568,46 @@ export default function OrdersClient({ orders }: { orders: Order[] }) {
                   <X size={20} />
                 </button>
               </div>
+            </div>
+
+            {/* Live delivery status — auto-synced from Mylerz on open. */}
+            <div className="border-b-2 border-navy/10 bg-surface px-5 py-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <StatusPill status={selected.status} />
+                  {(detailSync?.courierStatus || selected.courier?.status) && (
+                    <span className="text-xs font-bold text-navy">
+                      {detailSync?.courierStatus || selected.courier?.status}
+                    </span>
+                  )}
+                </div>
+                {isSyncable(selected) && (
+                  <button
+                    onClick={refreshDetailStatus}
+                    disabled={detailSyncing}
+                    className="flex items-center gap-1.5 border-2 border-navy/15 px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wider text-navy hover:border-brand hover:text-brand transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    <RefreshCw
+                      size={12}
+                      className={clsx(detailSyncing && "animate-spin")}
+                    />
+                    {detailSyncing ? "Syncing…" : "Refresh status"}
+                  </button>
+                )}
+              </div>
+              {detailSync?.statusDate &&
+                !Number.isNaN(Date.parse(detailSync.statusDate)) && (
+                  <p className="mt-1.5 text-[11px] text-muted">
+                    Last update:{" "}
+                    {new Date(detailSync.statusDate).toLocaleString("en-GB", {
+                      day: "2-digit",
+                      month: "short",
+                      year: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </p>
+                )}
             </div>
 
             <div className="flex-1 space-y-6 p-5">
@@ -599,6 +835,19 @@ export default function OrdersClient({ orders }: { orders: Order[] }) {
             </div>
           </aside>
         </>
+      )}
+
+      {toast && (
+        <div
+          className={clsx(
+            "fixed bottom-6 start-1/2 z-[60] -translate-x-1/2 border-2 px-4 py-2.5 text-sm font-bold shadow-lg",
+            toast.kind === "ok"
+              ? "border-success bg-white text-success"
+              : "border-brand bg-white text-brand"
+          )}
+        >
+          {toast.text}
+        </div>
       )}
     </div>
   );

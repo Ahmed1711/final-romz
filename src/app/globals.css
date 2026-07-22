@@ -10,6 +10,7 @@
   --color-muted: #58647f;
   --color-amber: #ffb000;
   --color-success: #18a755;
+  --color-purple: #6d28d9;
   --color-ice: #d7e3ff;
   --font-display: var(--font-anton), var(--font-cairo), system-ui, sans-serif;
   --font-sans: var(--font-body), var(--font-cairo), system-ui, sans-serif;

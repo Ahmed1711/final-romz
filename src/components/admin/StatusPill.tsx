@@ -2,13 +2,13 @@ import clsx from "clsx";
 import type { OrderStatus, PaymentMethod, PaymentStatus } from "@/lib/types";
 
 const statusStyles: Record<OrderStatus, string> = {
-  pending: "bg-brand text-white",
+  pending: "bg-surface text-navy border border-navy/20",
   confirmed: "bg-navy text-white",
-  processing: "bg-amber text-white",
-  shipped: "bg-navy text-white",
+  processing: "bg-navy/75 text-white",
+  shipped: "bg-amber text-white",
   delivered: "bg-success text-white",
-  cancelled: "bg-surface text-muted border border-navy/15",
-  returned: "bg-surface text-brand border border-brand/20",
+  returned: "bg-purple text-white",
+  cancelled: "bg-brand text-white",
 };
 
 export function StatusPill({ status }: { status: OrderStatus }) {
