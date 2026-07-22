@@ -11,15 +11,19 @@ const statusStyles: Record<OrderStatus, string> = {
   cancelled: "bg-brand text-white",
 };
 
-export function StatusPill({ status }: { status: OrderStatus }) {
+// Neutral fallback so an unexpected status (e.g. a new backend value) still
+// renders a visible badge instead of a blank one.
+const FALLBACK_STATUS_STYLE = "bg-surface text-navy border border-navy/20";
+
+export function StatusPill({ status }: { status: OrderStatus | string }) {
   return (
     <span
       className={clsx(
         "inline-block px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wider",
-        statusStyles[status]
+        statusStyles[status as OrderStatus] ?? FALLBACK_STATUS_STYLE
       )}
     >
-      {status}
+      {status || "unknown"}
     </span>
   );
 }
