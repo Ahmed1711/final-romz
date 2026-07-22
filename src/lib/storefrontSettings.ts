@@ -1,4 +1,10 @@
-import type { Faq, LocalizedText, ShippingReturns, StorefrontSettings } from "./types";
+import type {
+  ContactInfo,
+  Faq,
+  LocalizedText,
+  ShippingReturns,
+  StorefrontSettings,
+} from "./types";
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "").trim().replace(/\/+$/, "");
 
@@ -22,6 +28,13 @@ export const DEFAULT_STOREFRONT_SETTINGS: StorefrontSettings = {
     isActive: false,
     title: { en: "", ar: "" },
     body: { en: "", ar: "" },
+  },
+  contactInfo: {
+    isActive: false,
+    email: "",
+    phone: "",
+    address: { en: "", ar: "" },
+    workingHours: { en: "", ar: "" },
   },
 };
 
@@ -59,6 +72,18 @@ export const normalizeShippingReturns = (value: unknown): ShippingReturns => {
     isActive: typeof v.isActive === "boolean" ? v.isActive : false,
     title: localizedValue(v.title, EMPTY_TEXT),
     body: localizedValue(v.body, EMPTY_TEXT),
+  };
+};
+
+/** Normalize the store contact details. Defaults to hidden when absent. */
+export const normalizeContactInfo = (value: unknown): ContactInfo => {
+  const v = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+  return {
+    isActive: typeof v.isActive === "boolean" ? v.isActive : false,
+    email: textValue(v.email, ""),
+    phone: textValue(v.phone, ""),
+    address: localizedValue(v.address, EMPTY_TEXT),
+    workingHours: localizedValue(v.workingHours, EMPTY_TEXT),
   };
 };
 
@@ -118,6 +143,7 @@ export const normalizeStorefrontSettings = (value: unknown): StorefrontSettings 
         : DEFAULT_STOREFRONT_SETTINGS.lowStockThreshold,
     faqs: normalizeFaqs(input.faqs),
     shippingReturns: normalizeShippingReturns(input.shippingReturns),
+    contactInfo: normalizeContactInfo(input.contactInfo),
   };
 };
 

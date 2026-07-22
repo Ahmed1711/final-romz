@@ -8,6 +8,7 @@
 import type {
   Badge,
   Category,
+  ContactInfo,
   ContactMessage,
   ContactStatus,
   FabricCare,
@@ -29,6 +30,7 @@ import type {
 } from "./api";
 import { contactListQuery, mapContactMessage, mapProduct } from "./api";
 import {
+  normalizeContactInfo,
   normalizeFaqs,
   normalizeShippingReturns,
   normalizeStorefrontSettings,
@@ -596,6 +598,20 @@ export async function updateShippingReturns(
     { method: "PATCH", json: { shippingReturns } }
   );
   return normalizeShippingReturns(data.settings?.shippingReturns);
+}
+
+/**
+ * Patch the store contact details (shallow-merged). Full save sends all
+ * fields; a quick hide can send just { isActive: false }.
+ */
+export async function updateContactInfo(
+  contactInfo: ContactInfo | Partial<ContactInfo>
+): Promise<ContactInfo> {
+  const data = await adminFetch<{ settings: { contactInfo?: unknown } }>(
+    "/admin/storefront-settings",
+    { method: "PATCH", json: { contactInfo } }
+  );
+  return normalizeContactInfo(data.settings?.contactInfo);
 }
 
 // ── Analytics (client-side) ─────────────────────────────

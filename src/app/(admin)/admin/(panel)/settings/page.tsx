@@ -3,6 +3,7 @@ import { getStorefrontSettings } from "@/lib/storefrontSettings";
 import SettingsClient from "./SettingsClient";
 import FaqEditor from "./FaqEditor";
 import ShippingReturnsEditor from "./ShippingReturnsEditor";
+import ContactInfoEditor from "./ContactInfoEditor";
 
 export default async function AdminSettingsPage() {
   const settings = await getStorefrontSettings();
@@ -51,6 +52,7 @@ export default async function AdminSettingsPage() {
         </div>
 
         <div className="space-y-6">
+          <ContactInfoEditor contactInfo={settings.contactInfo} />
           <ShippingReturnsEditor shippingReturns={settings.shippingReturns} />
           <FaqEditor faqs={settings.faqs} />
         </div>

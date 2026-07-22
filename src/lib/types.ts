@@ -47,6 +47,8 @@ export interface StorefrontSettings {
   faqs: Faq[];
   /** Shipping & Returns block shown on product pages (backend-driven). */
   shippingReturns: ShippingReturns;
+  /** Store contact details shown on the contact page (backend-driven). */
+  contactInfo: ContactInfo;
 }
 
 /** A single FAQ entry from storefront settings (data.settings.faqs). */
@@ -64,6 +66,15 @@ export interface ShippingReturns {
   isActive: boolean;
   title: LocalizedText;
   body: LocalizedText;
+}
+
+/** Store contact details shown on the contact page (backend-driven). */
+export interface ContactInfo {
+  isActive: boolean;
+  email: string;
+  phone: string;
+  address: LocalizedText;
+  workingHours: LocalizedText;
 }
 
 export interface ProductColor {

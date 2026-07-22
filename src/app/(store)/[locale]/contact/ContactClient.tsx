@@ -6,8 +6,7 @@ import { Check, Clock, Mail, MapPin, Phone } from "lucide-react";
 import clsx from "clsx";
 import Button from "@/components/ui/Button";
 import { ApiError, submitContact } from "@/lib/api";
-import { getContactDetails } from "@/content/policies";
-import type { Locale } from "@/lib/types";
+import type { ContactInfo, Locale } from "@/lib/types";
 
 const inputCls =
   "w-full border-0 border-b-2 border-navy/30 bg-transparent px-1 py-2.5 text-sm text-navy placeholder:text-muted outline-none focus:border-brand transition-colors";
@@ -34,10 +33,17 @@ type FieldErrors = Partial<Record<keyof FormState, string>>;
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export default function ContactClient() {
+export default function ContactClient({
+  contactInfo,
+}: {
+  contactInfo: ContactInfo;
+}) {
   const t = useTranslations("contact");
   const locale = useLocale() as Locale;
-  const info = getContactDetails(locale);
+  // Backend-driven contact details, localized with an English fallback.
+  const address = contactInfo.address[locale] || contactInfo.address.en;
+  const workingHours =
+    contactInfo.workingHours[locale] || contactInfo.workingHours.en;
 
   const [form, setForm] = useState<FormState>(emptyForm);
   const [errors, setErrors] = useState<FieldErrors>({});
@@ -111,31 +117,46 @@ export default function ContactClient() {
                 {t("subtitle")}
               </p>
 
-              {/* Direct contact details (required for Paymob onboarding). */}
-              <div className="mt-6 grid gap-3 border-y-2 border-navy/10 py-6 text-sm sm:grid-cols-2">
-                <a
-                  href={`mailto:${info.email}`}
-                  className="flex items-center gap-3 text-navy transition-colors hover:text-brand"
+              {/* Backend-driven contact details (required for Paymob
+                  onboarding). Whole block hides when inactive; each line hides
+                  when its value is empty. */}
+              {contactInfo.isActive && (
+                <div
+                  dir={locale === "ar" ? "rtl" : "ltr"}
+                  className="mt-6 grid gap-3 border-y-2 border-navy/10 py-6 text-sm sm:grid-cols-2"
                 >
-                  <Mail size={18} className="shrink-0 text-brand" />
-                  <span dir="ltr">{info.email}</span>
-                </a>
-                <a
-                  href={`tel:${info.phone.replace(/\s+/g, "")}`}
-                  className="flex items-center gap-3 text-navy transition-colors hover:text-brand"
-                >
-                  <Phone size={18} className="shrink-0 text-brand" />
-                  <span dir="ltr">{info.phone}</span>
-                </a>
-                <div className="flex items-center gap-3 text-navy">
-                  <MapPin size={18} className="shrink-0 text-brand" />
-                  <span>{info.address}</span>
+                  {contactInfo.email && (
+                    <a
+                      href={`mailto:${contactInfo.email}`}
+                      className="flex items-center gap-3 text-navy transition-colors hover:text-brand"
+                    >
+                      <Mail size={18} className="shrink-0 text-brand" />
+                      <span dir="ltr">{contactInfo.email}</span>
+                    </a>
+                  )}
+                  {contactInfo.phone && (
+                    <a
+                      href={`tel:${contactInfo.phone.replace(/\s+/g, "")}`}
+                      className="flex items-center gap-3 text-navy transition-colors hover:text-brand"
+                    >
+                      <Phone size={18} className="shrink-0 text-brand" />
+                      <span dir="ltr">{contactInfo.phone}</span>
+                    </a>
+                  )}
+                  {address && (
+                    <div className="flex items-center gap-3 text-navy">
+                      <MapPin size={18} className="shrink-0 text-brand" />
+                      <span>{address}</span>
+                    </div>
+                  )}
+                  {workingHours && (
+                    <div className="flex items-center gap-3 text-navy">
+                      <Clock size={18} className="shrink-0 text-brand" />
+                      <span>{workingHours}</span>
+                    </div>
+                  )}
                 </div>
-                <div className="flex items-center gap-3 text-navy">
-                  <Clock size={18} className="shrink-0 text-brand" />
-                  <span>{info.hours}</span>
-                </div>
-              </div>
+              )}
 
               {sent ? (
                 <div className="mt-8 flex flex-col items-center gap-4 border-2 border-success/40 bg-success/5 px-6 py-10 text-center">

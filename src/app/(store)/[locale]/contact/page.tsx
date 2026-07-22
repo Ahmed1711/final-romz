@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { setRequestLocale } from "next-intl/server";
+import { getStorefrontSettings } from "@/lib/storefrontSettings";
 import ContactClient from "./ContactClient";
 
 export const metadata: Metadata = {
@@ -14,6 +15,7 @@ export default async function ContactPage({
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
+  const settings = await getStorefrontSettings();
 
-  return <ContactClient />;
+  return <ContactClient contactInfo={settings.contactInfo} />;
 }
