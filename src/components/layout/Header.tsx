@@ -22,7 +22,8 @@ export default function Header({ categories = [] }: { categories?: Category[] })
   const drawerOffscreenX = isRtl ? "100%" : "-100%";
 
   return (
-    <header className="sticky top-0 z-40 border-b-2 border-navy bg-page/95 backdrop-blur">
+    <>
+      <header className="sticky top-0 z-40 border-b-2 border-navy bg-page/95 backdrop-blur">
       <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-4 px-6 py-3">
         <button
           className="lg:hidden text-navy cursor-pointer"
@@ -115,6 +116,7 @@ export default function Header({ categories = [] }: { categories?: Category[] })
           </button>
         </div>
       </div>
+      </header>
 
       <AnimatePresence>
         {mobileOpen && (
@@ -213,6 +215,6 @@ export default function Header({ categories = [] }: { categories?: Category[] })
           </div>
         )}
       </AnimatePresence>
-    </header>
+    </>
   );
 }
