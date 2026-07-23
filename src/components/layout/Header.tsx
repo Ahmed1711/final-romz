@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { ChevronDown, Menu, Search, ShoppingCart, User, X } from "lucide-react";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Link } from "@/i18n/navigation";
 import { useCart } from "@/components/cart/CartProvider";
 import { lt } from "@/lib/format";
@@ -14,8 +14,12 @@ import Logo from "./Logo";
 export default function Header({ categories = [] }: { categories?: Category[] }) {
   const t = useTranslations("nav");
   const locale = useLocale() as Locale;
+  const isRtl = locale === "ar";
+  const reducedMotion = useReducedMotion();
   const { count, setOpen } = useCart();
   const [mobileOpen, setMobileOpen] = useState(false);
+  // Drawer slides in from the start edge: left in English, right in Arabic.
+  const drawerOffscreenX = isRtl ? "100%" : "-100%";
 
   return (
     <header className="sticky top-0 z-40 border-b-2 border-navy bg-page/95 backdrop-blur">
@@ -114,70 +118,99 @@ export default function Header({ categories = [] }: { categories?: Category[] })
 
       <AnimatePresence>
         {mobileOpen && (
-          <motion.nav
-            initial={{ height: 0, opacity: 0, paddingTop: 0, paddingBottom: 0 }}
-            animate={{ height: "auto", opacity: 1, paddingTop: 12, paddingBottom: 12 }}
-            exit={{ height: 0, opacity: 0, paddingTop: 0, paddingBottom: 0 }}
-            transition={{ duration: 0.25, ease: "easeOut" }}
-            className="lg:hidden overflow-hidden border-t border-navy/10 bg-white px-4 py-3"
-          >
-            <Link
-              href="/"
+          <div className="lg:hidden fixed inset-0 z-50">
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="absolute inset-0 bg-navy/40 backdrop-blur-sm"
               onClick={() => setMobileOpen(false)}
-              className="block py-2.5 font-display uppercase text-navy hover:text-brand"
+            />
+            {/* Side drawer: slides in from the start edge (left LTR / right RTL) */}
+            <motion.nav
+              initial={reducedMotion ? { opacity: 0 } : { x: drawerOffscreenX }}
+              animate={reducedMotion ? { opacity: 1 } : { x: 0 }}
+              exit={reducedMotion ? { opacity: 0 } : { x: drawerOffscreenX }}
+              transition={
+                reducedMotion
+                  ? { duration: 0.15 }
+                  : { type: "spring", stiffness: 320, damping: 32 }
+              }
+              className="absolute inset-y-0 start-0 flex w-4/5 max-w-xs flex-col overflow-y-auto border-e-2 border-navy bg-white shadow-2xl"
             >
-              {t("newDrop")}
-            </Link>
+              <div className="flex items-center justify-between border-b-2 border-navy/10 px-4 py-3">
+                <Logo className="text-2xl text-brand" />
+                <button
+                  onClick={() => setMobileOpen(false)}
+                  aria-label="close menu"
+                  className="text-navy hover:text-brand cursor-pointer"
+                >
+                  <X size={22} />
+                </button>
+              </div>
 
-            {categories.map((cat) => (
-              <div key={cat.id}>
+              <div className="px-4 py-3">
                 <Link
-                  href={`/category/${cat.slug}`}
+                  href="/"
                   onClick={() => setMobileOpen(false)}
                   className="block py-2.5 font-display uppercase text-navy hover:text-brand"
                 >
-                  {lt(cat.name, locale)}
+                  {t("newDrop")}
                 </Link>
-                {cat.children && cat.children.length > 0 && (
-                  <div className="mb-1 ms-4 border-s-2 border-navy/10 ps-3">
-                    {cat.children.map((sub) => (
-                      <Link
-                        key={sub.id}
-                        href={`/category/${sub.slug}`}
-                        onClick={() => setMobileOpen(false)}
-                        className="block py-1.5 text-sm font-bold uppercase text-muted hover:text-brand"
-                      >
-                        {lt(sub.name, locale)}
-                      </Link>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ))}
 
-            <Link
-              href="/track-order"
-              onClick={() => setMobileOpen(false)}
-              className="block py-2.5 font-display uppercase text-navy hover:text-brand"
-            >
-              {t("trackOrder")}
-            </Link>
-            <Link
-              href="/contact"
-              onClick={() => setMobileOpen(false)}
-              className="block py-2.5 font-display uppercase text-navy hover:text-brand"
-            >
-              {t("contact")}
-            </Link>
-            <Link
-              href="/account"
-              onClick={() => setMobileOpen(false)}
-              className="flex items-center gap-2 border-t border-navy/10 py-2.5 font-display uppercase text-navy hover:text-brand"
-            >
-              <User size={16} />
-              {t("account")}
-            </Link>
-          </motion.nav>
+                {categories.map((cat) => (
+                  <div key={cat.id}>
+                    <Link
+                      href={`/category/${cat.slug}`}
+                      onClick={() => setMobileOpen(false)}
+                      className="block py-2.5 font-display uppercase text-navy hover:text-brand"
+                    >
+                      {lt(cat.name, locale)}
+                    </Link>
+                    {cat.children && cat.children.length > 0 && (
+                      <div className="mb-1 ms-4 border-s-2 border-navy/10 ps-3">
+                        {cat.children.map((sub) => (
+                          <Link
+                            key={sub.id}
+                            href={`/category/${sub.slug}`}
+                            onClick={() => setMobileOpen(false)}
+                            className="block py-1.5 text-sm font-bold uppercase text-muted hover:text-brand"
+                          >
+                            {lt(sub.name, locale)}
+                          </Link>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+
+                <Link
+                  href="/track-order"
+                  onClick={() => setMobileOpen(false)}
+                  className="block py-2.5 font-display uppercase text-navy hover:text-brand"
+                >
+                  {t("trackOrder")}
+                </Link>
+                <Link
+                  href="/contact"
+                  onClick={() => setMobileOpen(false)}
+                  className="block py-2.5 font-display uppercase text-navy hover:text-brand"
+                >
+                  {t("contact")}
+                </Link>
+                <Link
+                  href="/account"
+                  onClick={() => setMobileOpen(false)}
+                  className="flex items-center gap-2 border-t border-navy/10 py-2.5 font-display uppercase text-navy hover:text-brand"
+                >
+                  <User size={16} />
+                  {t("account")}
+                </Link>
+              </div>
+            </motion.nav>
+          </div>
         )}
       </AnimatePresence>
     </header>
