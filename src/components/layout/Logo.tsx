@@ -3,6 +3,10 @@ import clsx from "clsx";
 /**
  * Official ROMZ lockup: the geometric "R" mark from the brand book
  * (extracted from ROMZ BRANDING VOL1) next to the wordmark.
+ *
+ * The mark is rendered as a CSS mask filled with `currentColor`, so the mark
+ * and the wordmark always share the exact same color (and recolor together on
+ * hover) instead of the mark being a fixed-color image.
  */
 export default function Logo({
   className,
@@ -18,23 +22,33 @@ export default function Logo({
   return (
     <span
       className={clsx(
-        "logo-3d group inline-flex items-center gap-[0.3em] font-display uppercase leading-none tracking-wide",
+        "logo-3d group inline-flex items-center gap-[0.3em] font-display uppercase leading-none tracking-wide transition-colors duration-300 hover:text-brand",
         light ? "text-white" : "text-navy",
         className
       )}
     >
       {withMark && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={light ? "/brand/romz-mark-white.png" : "/brand/romz-mark.png"}
-          alt=""
+        <span
           aria-hidden
-          className={clsx("logo-3d-mark shrink-0 select-none", markClassName)}
+          className={clsx(
+            "logo-3d-mark inline-block shrink-0 select-none",
+            markClassName
+          )}
+          style={{
+            aspectRatio: "668 / 372",
+            backgroundColor: "currentColor",
+            WebkitMaskImage: "url(/brand/romz-mark.png)",
+            maskImage: "url(/brand/romz-mark.png)",
+            WebkitMaskSize: "contain",
+            maskSize: "contain",
+            WebkitMaskRepeat: "no-repeat",
+            maskRepeat: "no-repeat",
+            WebkitMaskPosition: "center",
+            maskPosition: "center",
+          }}
         />
       )}
-      <span className="transition-colors duration-300 group-hover:text-brand">
-        ROMZ
-      </span>
+      <span>ROMZ</span>
     </span>
   );
 }
