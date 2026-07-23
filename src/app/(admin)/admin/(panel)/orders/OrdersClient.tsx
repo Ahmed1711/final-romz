@@ -279,11 +279,11 @@ export default function OrdersClient({ orders }: { orders: Order[] }) {
       setNextStatus("");
 
       // Keep Mylerz in sync with the order status:
-      //   confirmed → create the shipment (once), cancelled → cancel the package.
+      //   shipped → create the shipment (once), cancelled → cancel the package.
       // A failure here never rolls back the status; it's surfaced as a note.
       const shipmentId =
         order.courier?.trackingNumber || order.courier?.pickupOrderCode;
-      if (status === "confirmed" && !shipmentId) {
+      if (status === "shipped" && !shipmentId) {
         await autoCreateShipment(order);
       } else if (status === "cancelled" && shipmentId) {
         await autoCancelShipment(order);
@@ -299,21 +299,21 @@ export default function OrdersClient({ orders }: { orders: Order[] }) {
     }
   };
 
-  // Create the Mylerz shipment when an order is confirmed. Mirrors the manual
-  // panel's guards (valid Egyptian mobile + real zone codes); legacy orders
-  // without codes are left for the admin to ship manually.
+  // Create the Mylerz shipment when an order is marked shipped. Mirrors the
+  // manual panel's guards (valid Egyptian mobile + real zone codes); legacy
+  // orders without codes are left for the admin to ship manually.
   const autoCreateShipment = async (order: Order) => {
     if (!isValidEgyptMobile(order.customer.phone)) {
       setShipmentNote({
         kind: "error",
-        text: "Confirmed, but no Mylerz shipment was created: the recipient phone isn't a valid Egyptian mobile. Fix it, then create the shipment in the Mylerz panel.",
+        text: "Marked shipped, but no Mylerz shipment was created: the recipient phone isn't a valid Egyptian mobile. Fix it, then create the shipment in the Mylerz panel.",
       });
       return;
     }
     if (!order.shippingAddress.governorateCode || !order.shippingAddress.zoneCode) {
       setShipmentNote({
         kind: "error",
-        text: "Confirmed, but no Mylerz shipment was created: this order has no Mylerz zone codes (placed before checkout collected them). Create it manually in the Mylerz panel.",
+        text: "Marked shipped, but no Mylerz shipment was created: this order has no Mylerz zone codes (placed before checkout collected them). Create it manually in the Mylerz panel.",
       });
       return;
     }
@@ -322,11 +322,11 @@ export default function OrdersClient({ orders }: { orders: Order[] }) {
       setSelected((s) =>
         s && s.id === order.id ? { ...s, courier: result.courier } : s
       );
-      setShipmentNote({ kind: "ok", text: "Confirmed and Mylerz shipment created." });
+      setShipmentNote({ kind: "ok", text: "Marked shipped and Mylerz shipment created." });
     } catch (error) {
       setShipmentNote({
         kind: "error",
-        text: `Confirmed, but the Mylerz shipment failed: ${
+        text: `Marked shipped, but the Mylerz shipment failed: ${
           error instanceof Error ? error.message : "unknown error"
         }`,
       });
